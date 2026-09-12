@@ -89,6 +89,10 @@ button {
   min-height: 100dvh;
 }
 
+.ledger.shelf-layout {
+  max-width: 72rem;
+}
+
 .ledger-brand {
   margin-bottom: 3rem;
 }
@@ -106,6 +110,105 @@ button {
   margin: 0.85rem 0 0;
   color: var(--muted);
   font-size: 1.05rem;
+}
+
+.library-stats {
+  margin: 0.65rem 0 0;
+}
+
+.toolbar-label {
+  margin: 0.15rem 0 -0.25rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.genre-row {
+  padding-bottom: 0.15rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.author-gallery,
+.genre-gallery {
+  display: grid;
+  gap: 2.1rem;
+}
+
+.author-club,
+.genre-club {
+  min-width: 0;
+}
+
+.author-club.nested {
+  margin-top: 1.15rem;
+  padding-top: 0.85rem;
+  border-top: 1px dashed color-mix(in srgb, var(--line) 80%, transparent);
+}
+
+.author-club-head,
+.genre-club-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.author-club-head h3,
+.genre-club-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 3.5vw, 1.85rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.author-club-head.compact h4 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.genre-club {
+  padding-bottom: 0.4rem;
+}
+
+.genre-club + .genre-club {
+  margin-top: 0.4rem;
+  padding-top: 1.6rem;
+  border-top: 1px solid var(--line);
+}
+
+.bookshelf.author-rail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(8.2rem, 9.5rem);
+  justify-content: start;
+  gap: 1rem;
+  overflow-x: auto;
+  padding: 0.35rem 0.15rem 0.85rem;
+  margin: 0 -0.15rem;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+
+.bookshelf.author-rail.single {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  grid-auto-columns: unset;
+  overflow: visible;
+  padding-bottom: 0;
+}
+
+.bookshelf.author-rail .book-tile {
+  scroll-snap-align: start;
+}
+
+.book-tile.compact .book-tile-title {
+  font-size: 0.9rem;
+  -webkit-line-clamp: 2;
 }
 
 .ledger-section {
@@ -132,14 +235,25 @@ button {
 }
 
 .continue-card {
-  display: block;
-  padding: 1.35rem 0 0.4rem;
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: 1.25rem;
+  align-items: center;
+  padding: 0.4rem 0 0.2rem;
+}
+
+.continue-cover {
+  width: 5.5rem;
+  aspect-ratio: 2 / 3;
+  border-radius: 2px;
+  overflow: hidden;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--fg) 12%, transparent);
 }
 
 .continue-title {
   display: block;
   font-family: var(--font-display);
-  font-size: clamp(1.8rem, 6vw, 2.45rem);
+  font-size: clamp(1.55rem, 4.5vw, 2.2rem);
   line-height: 1.15;
   letter-spacing: -0.02em;
 }
@@ -157,8 +271,14 @@ button {
   padding: 0.85rem 1.1rem;
   border-radius: 0;
   width: 100%;
+  max-width: 16rem;
   text-align: left;
   font-size: 1.05rem;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.add-btn:hover {
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
 }
 
 .add-btn:active {
@@ -166,10 +286,233 @@ button {
   color: var(--bg);
 }
 
+.add-btn:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+
 .status {
   margin: 0.75rem 0 0;
   color: var(--muted);
   font-size: 0.95rem;
+}
+
+.shelf-toolbar {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.search-field input {
+  width: 100%;
+  appearance: none;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  padding: 0.75rem 0.85rem;
+}
+
+.search-field input:focus {
+  outline: 2px solid color-mix(in srgb, var(--fg) 35%, transparent);
+  outline-offset: 1px;
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.filter-row.compact {
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.chip {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  color: var(--muted);
+  padding: 0.35rem 0.15rem;
+  font-size: 0.92rem;
+  letter-spacing: 0.02em;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.chip:hover {
+  color: var(--fg);
+}
+
+.chip.on {
+  color: var(--fg);
+  border-bottom-color: var(--fg);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 3px;
+}
+
+.sort-field select {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 0.35rem 0.1rem;
+  border-radius: 0;
+  color: var(--muted);
+}
+
+.shelf-actions {
+  margin-bottom: 1.5rem;
+}
+
+.bookshelf {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 1.5rem 1rem;
+}
+
+.book-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.book-tile-link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.book-cover-wrap {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--card);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--fg) 8%, transparent),
+    0 12px 28px color-mix(in srgb, var(--fg) 10%, transparent);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.book-tile-link:hover .book-cover-wrap {
+  transform: translateY(-3px);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--fg) 8%, transparent),
+    0 18px 32px color-mix(in srgb, var(--fg) 14%, transparent);
+}
+
+.cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cover-spine {
+  width: 100%;
+  height: 100%;
+  padding: 0.85rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #f5f5f4;
+}
+
+.cover-spine-title {
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cover-spine-author {
+  font-size: 0.72rem;
+  opacity: 0.8;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cover-spine-format {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.book-progress {
+  position: absolute;
+  left: 0.45rem;
+  bottom: 0.45rem;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  color: var(--fg);
+  font-size: 0.7rem;
+  padding: 0.15rem 0.35rem;
+  font-family: var(--font-mono);
+}
+
+.book-tile-title {
+  font-family: var(--font-display);
+  font-size: 0.98rem;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.book-tile-meta,
+.book-tile-sub {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tile-remove {
+  align-self: flex-start;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.book-tile:hover .tile-remove,
+.book-tile:focus-within .tile-remove {
+  opacity: 1;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .book-list {
@@ -283,6 +626,54 @@ button {
 
 body.dropping .drop-veil {
   display: flex;
+}
+
+@media (max-width: 640px) {
+  .bookshelf {
+    grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+    gap: 1.15rem 0.75rem;
+  }
+
+  .bookshelf.author-rail {
+    grid-auto-columns: minmax(7.1rem, 8.2rem);
+    gap: 0.75rem;
+  }
+
+  .bookshelf.author-rail.single {
+    grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+  }
+
+  .tile-remove {
+    opacity: 1;
+  }
+
+  .continue-card {
+    grid-template-columns: 4.5rem 1fr;
+  }
+
+  .continue-cover {
+    width: 4.5rem;
+  }
+
+  .author-club-head,
+  .genre-club-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .book-cover-wrap,
+  .add-btn,
+  .chip,
+  .tile-remove {
+    transition: none;
+  }
+
+  .book-tile-link:hover .book-cover-wrap {
+    transform: none;
+  }
 }
 
 /* ——— Reader ——— */
