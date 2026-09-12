@@ -39,6 +39,13 @@ export interface BookRecord {
   hasCover: boolean;
   /** Soft collection used for shelf filters */
   shelf?: string;
+  /**
+   * When true, open the locally converted reflowable EPUB instead of the
+   * fixed-layout PDF pages (text-layer PDFs only).
+   */
+  preferReflow?: boolean;
+  /** True after a successful PDF → EPUB reflow conversion is stored. */
+  hasReflow?: boolean;
 }
 
 export interface ProgressRecord {
