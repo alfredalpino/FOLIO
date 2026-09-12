@@ -7,11 +7,14 @@ import {
   getBook,
   getFileBlob,
   getProgress,
+  getReflowBlob,
   getSettings,
   listBookmarks,
   removeBookmark,
   saveProgress,
+  saveReflowBlob,
   saveSettings,
+  setPreferReflow,
 } from "@/lib/db";
 import {
   contentCSS,
@@ -19,6 +22,7 @@ import {
   PROFILE_COLORS,
 } from "@/lib/profiles";
 import { runWaveform } from "@/lib/eink-waveform";
+import { convertPdfToReflowEpub } from "@/lib/pdf-reflow";
 import { ReadingSettingsForm } from "@/components/ReadingSettingsForm";
 import type {
   AppSettings,
@@ -74,6 +78,11 @@ export function ReaderShell({ bookId }: { bookId: string }) {
   const [bookmarks, setBookmarks] = useState<BookmarkRecord[]>([]);
   const [error, setError] = useState("");
   const [booting, setBooting] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [usingReflow, setUsingReflow] = useState(false);
+  const [converting, setConverting] = useState(false);
+  const [convertStatus, setConvertStatus] = useState("");
+  const [convertError, setConvertError] = useState("");
 
   const flash = useCallback(async (profile: AppSettings["refresh"]) => {
     if (!flashRef.current) return;
@@ -142,6 +151,7 @@ export function ReaderShell({ bookId }: { bookId: string }) {
     let wake: WakeLockSentinel | null = null;
 
     async function boot() {
+      setBooting(true);
       try {
         const [meta, blob, progress, s, marks] = await Promise.all([
           getBook(bookId),
@@ -161,6 +171,7 @@ export function ReaderShell({ bookId }: { bookId: string }) {
         setBookmarks(marks);
         setFraction(progress?.fraction || meta.progress || 0);
         setChapter(progress?.chapterLabel || meta.chapterLabel || "");
+        setConvertError("");
 
         await import(
           /* webpackIgnore: true */
@@ -173,12 +184,28 @@ export function ReaderShell({ bookId }: { bookId: string }) {
         hostRef.current.append(view);
         viewRef.current = view;
 
+        const wantReflow =
+          meta.format === "pdf" && meta.preferReflow && meta.hasReflow;
+        const reflowBlob = wantReflow ? await getReflowBlob(bookId) : null;
+        const openBlob = reflowBlob || blob;
+        const openAsReflow = Boolean(reflowBlob);
+        setUsingReflow(openAsReflow);
+
         const file =
-          blob instanceof File
-            ? blob
-            : new File([blob], meta.fileName || "book.epub", {
-                type: blob.type || "application/epub+zip",
-              });
+          openBlob instanceof File
+            ? openBlob
+            : new File(
+                [openBlob],
+                openAsReflow
+                  ? (meta.fileName || "book").replace(/\.pdf$/i, "") +
+                      ".reflow.epub"
+                  : meta.fileName || "book.epub",
+                {
+                  type: openAsReflow
+                    ? "application/epub+zip"
+                    : openBlob.type || "application/epub+zip",
+                },
+              );
 
         await view.open(file);
         applyReaderStyle(view, s);
@@ -251,7 +278,7 @@ export function ReaderShell({ bookId }: { bookId: string }) {
       void wake?.release();
       viewRef.current = null;
     };
-  }, [applyReaderStyle, bookId, handleZone]);
+  }, [applyReaderStyle, bookId, handleZone, reloadKey]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -308,6 +335,56 @@ export function ReaderShell({ bookId }: { bookId: string }) {
     setBookmarks(await listBookmarks(bookId));
   }
 
+  async function convertPdfReflow() {
+    if (!book || book.format !== "pdf" || converting) return;
+    setConverting(true);
+    setConvertError("");
+    setConvertStatus("Reading PDF text layer…");
+    try {
+      const blob = await getFileBlob(bookId);
+      if (!blob) throw new Error("PDF file missing on this device.");
+      const result = await convertPdfToReflowEpub(
+        blob,
+        {
+          title: book.title,
+          authors: book.authors,
+          language: book.language,
+        },
+        {
+          onProgress: (done, total) => {
+            setConvertStatus(`Extracting page ${done} / ${total}…`);
+          },
+        },
+      );
+      setConvertStatus(
+        `Building reflowable EPUB (${result.chapterCount} sections)…`,
+      );
+      await saveReflowBlob(bookId, result.epub);
+      const next = await getBook(bookId);
+      if (next) setBook(next);
+      setConvertStatus("Opening reflow…");
+      setBooting(true);
+      setReloadKey((k) => k + 1);
+    } catch (err) {
+      console.error(err);
+      setConvertError(
+        err instanceof Error ? err.message : "Could not convert this PDF.",
+      );
+    } finally {
+      setConverting(false);
+      setConvertStatus("");
+    }
+  }
+
+  async function togglePdfLayout(preferReflow: boolean) {
+    if (!book?.hasReflow) return;
+    await setPreferReflow(bookId, preferReflow);
+    const next = await getBook(bookId);
+    if (next) setBook(next);
+    setBooting(true);
+    setReloadKey((k) => k + 1);
+  }
+
   if (error) {
     return (
       <main className="reader-error">
@@ -322,7 +399,7 @@ export function ReaderShell({ bookId }: { bookId: string }) {
       className="reader-root"
       data-profile={settings.profile}
       data-refresh={settings.refresh}
-      data-format={book?.format || "epub"}
+      data-format={usingReflow ? "epub" : book?.format || "epub"}
     >
       <div ref={ghostRef} className="page-ghost" aria-hidden />
       <div ref={flashRef} className="page-flash" aria-hidden />
@@ -362,6 +439,38 @@ export function ReaderShell({ bookId }: { bookId: string }) {
               <button type="button" onClick={() => setPanel("settings")}>
                 Settings
               </button>
+              {book?.format === "pdf" ? (
+                <>
+                  {!book.hasReflow ? (
+                    <button
+                      type="button"
+                      disabled={converting}
+                      onClick={() => void convertPdfReflow()}
+                    >
+                      {converting
+                        ? convertStatus || "Converting…"
+                        : "Convert PDF → reflow"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void togglePdfLayout(!usingReflow)}
+                    >
+                      {usingReflow
+                        ? "Switch to PDF page mode"
+                        : "Switch to reflow text"}
+                    </button>
+                  )}
+                  {convertError ? (
+                    <p className="muted convert-error">{convertError}</p>
+                  ) : null}
+                  {usingReflow ? (
+                    <p className="muted">
+                      Reflow on — fonts &amp; justify apply like EPUB.
+                    </p>
+                  ) : null}
+                </>
+              ) : null}
               <Link href="/" className="close-book">
                 Close book
               </Link>

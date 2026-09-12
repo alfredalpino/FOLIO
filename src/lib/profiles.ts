@@ -2,7 +2,6 @@ import type {
   AppSettings,
   ReadingFont,
   ReadingProfile,
-  RefreshProfile,
   TextAlign,
 } from "./types";
 

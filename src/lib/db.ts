@@ -117,6 +117,39 @@ export async function getFileBlob(id: string) {
   return row?.blob ?? null;
 }
 
+/** Stored reflowable EPUB derived from a PDF text layer. */
+export function reflowFileId(bookId: string) {
+  return `${bookId}__reflow`;
+}
+
+export async function getReflowBlob(bookId: string) {
+  await ensureFolioDb();
+  const row = await db.files.get(reflowFileId(bookId));
+  return row?.blob ?? null;
+}
+
+export async function saveReflowBlob(bookId: string, epub: Blob) {
+  await ensureFolioDb();
+  await db.transaction("rw", db.books, db.files, async () => {
+    await db.files.put({ id: reflowFileId(bookId), blob: epub });
+    const book = await db.books.get(bookId);
+    if (book) {
+      await db.books.put({
+        ...book,
+        hasReflow: true,
+        preferReflow: true,
+      });
+    }
+  });
+}
+
+export async function setPreferReflow(bookId: string, prefer: boolean) {
+  await ensureFolioDb();
+  const book = await db.books.get(bookId);
+  if (!book) return;
+  await db.books.put({ ...book, preferReflow: prefer });
+}
+
 export async function getCoverBlob(id: string) {
   await ensureFolioDb();
   const row = await db.covers.get(id);
@@ -153,6 +186,7 @@ export async function deleteBook(id: string) {
     async () => {
       await db.books.delete(id);
       await db.files.delete(id);
+      await db.files.delete(reflowFileId(id));
       await db.covers.delete(id);
       await db.progress.delete(id);
       await db.bookmarks.where("bookId").equals(id).delete();

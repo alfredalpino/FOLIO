@@ -1189,6 +1189,12 @@ button {
 
 .muted {
   color: var(--muted);
+  font-size: 0.9em;
+}
+
+.convert-error {
+  color: #b33;
+  max-width: 18rem;
 }
 
 .tiny {
