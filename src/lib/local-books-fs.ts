@@ -1,4 +1,4 @@
-import { createReadStream } from "node:fs";
+import { createReadStream, existsSync } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -17,11 +17,14 @@ export function localBooksRoot() {
   return path.resolve(process.cwd(), "books");
 }
 
+/** Serve the repo `books/` library in any environment where the folder exists. */
+export function assertBooksAvailable() {
+  return existsSync(localBooksRoot());
+}
+
+/** @deprecated use assertBooksAvailable */
 export function assertDevLocalBooks() {
-  if (process.env.NODE_ENV === "production" && process.env.ALLOW_LOCAL_BOOKS !== "1") {
-    return false;
-  }
-  return true;
+  return assertBooksAvailable();
 }
 
 export function resolveLocalBookPath(relativePath: string) {

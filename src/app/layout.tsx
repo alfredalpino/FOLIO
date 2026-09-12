@@ -23,14 +23,14 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PAPER",
+  title: "FOLIO",
   description:
     "A private, local-first, e-ink-inspired reading machine. Books stay on your device.",
-  applicationName: "PAPER",
+  applicationName: "FOLIO",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "PAPER",
+    title: "FOLIO",
   },
   formatDetection: {
     telephone: false,

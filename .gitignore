@@ -46,3 +46,8 @@ next-env.d.ts
 # Unpacked EPUB trees (directories named *.epub) — keep only archive files
 /books/100M Money Models.epub/
 /books/Mathematical Thinking - for People Who Hate Math Level Up Your Analytical and Creative Thinking Skills Excel at Problem-Solving and Decision-Making.epub/
+
+# Composio download scratch (not part of the library)
+/books/from-drive/jobs.jsonl
+/books/from-drive/manifest.json
+/books/from-drive/missing_urls.json

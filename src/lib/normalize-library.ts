@@ -8,7 +8,7 @@ import {
 } from "./book-meta";
 import type { BookRecord } from "./types";
 
-const FLAG = "paper-meta-normalized-v5";
+const FLAG = "folio-meta-normalized-v1";
 
 function needsNormalize(book: BookRecord) {
   if (!book.shelf) return true;
