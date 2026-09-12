@@ -24,7 +24,7 @@ Open [http://localhost:3000](http://localhost:3000), add an EPUB, then **Add to 
 
 ## Notes
 
-- Your personal `books/` folder ships with the repo (Git LFS). On first open, FOLIO imports those files into on-device IndexedDB.
+- Your personal `books/` folder ships with the repo (Git LFS). Locally, FOLIO imports those files into on-device IndexedDB on first open. For Vercel, turn on Git LFS in project settings if book binaries must be present at runtime (do not put `git lfs pull` in the build script).
 - Page turns are instant by default. Optional Kindle / E-Ink / Ghosting profiles exist in settings.
 - Tap zones: left = previous, right = next, center = menu.
 - Install: use **Install as app** when Chrome offers it, or Share → Add to Home Screen on iPhone.
