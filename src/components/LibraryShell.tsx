@@ -6,24 +6,134 @@ import { BookTile } from "@/components/BookTile";
 import { CoverThumb } from "@/components/CoverThumb";
 import { ReadingSettingsForm } from "@/components/ReadingSettingsForm";
 import { shelfOrder } from "@/lib/book-meta";
-import {
-  clubByAuthor,
-  clubByGenre,
-  type LibraryView,
-} from "@/lib/library-organize";
 import { useLibrary } from "@/store/library";
 import type { BookRecord } from "@/lib/types";
 
+type Tab = "home" | "library" | "more";
+type SortKey = "recent" | "title" | "author" | "progress";
 type FormatFilter = "all" | "epub" | "pdf";
 
 function pct(n: number) {
   return `${Math.round((n || 0) * 100)}%`;
 }
 
-function continueBook(books: BookRecord[]) {
-  return [...books]
-    .filter((b) => b.lastReadAt)
-    .sort((a, b) => b.lastReadAt.localeCompare(a.lastReadAt))[0];
+function byRecent(books: BookRecord[]) {
+  return [...books].sort((a, b) => {
+    const aKey = a.lastReadAt || a.addedAt;
+    const bKey = b.lastReadAt || b.addedAt;
+    return bKey.localeCompare(aKey);
+  });
+}
+
+function sortBooks(books: BookRecord[], sort: SortKey) {
+  const list = [...books];
+  if (sort === "title") return list.sort((a, b) => a.title.localeCompare(b.title));
+  if (sort === "author") {
+    return list.sort((a, b) => {
+      const byAuthor = (a.authors[0] || "").localeCompare(b.authors[0] || "");
+      return byAuthor || a.title.localeCompare(b.title);
+    });
+  }
+  if (sort === "progress") return list.sort((a, b) => b.progress - a.progress);
+  return byRecent(list);
+}
+
+function IconHome({ active }: { active: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"
+        stroke="currentColor"
+        strokeWidth={active ? 2 : 1.6}
+        strokeLinejoin="round"
+        fill={active ? "currentColor" : "none"}
+        fillOpacity={active ? 0.15 : 0}
+      />
+    </svg>
+  );
+}
+
+function IconLibrary({ active }: { active: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M5 4h3v16H5V4Zm5.5 0h3v16h-3V4ZM16 4h3v16h-3V4Z"
+        stroke="currentColor"
+        strokeWidth={active ? 2 : 1.6}
+        fill={active ? "currentColor" : "none"}
+        fillOpacity={active ? 0.2 : 0}
+      />
+    </svg>
+  );
+}
+
+function IconMore({ active }: { active: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M4 7h16M4 12h16M4 17h16"
+        stroke="currentColor"
+        strokeWidth={active ? 2.2 : 1.7}
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function SearchField({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <label className="k-search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.7" />
+        <path d="m16.5 16.5 4 4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      </svg>
+      <span className="sr-only">Search</span>
+      <input
+        type="search"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        enterKeyHint="search"
+      />
+    </label>
+  );
+}
+
+function CoverRail({
+  title,
+  books,
+  onRemove,
+}: {
+  title: string;
+  books: BookRecord[];
+  onRemove: (book: BookRecord) => void;
+}) {
+  if (!books.length) return null;
+  return (
+    <section className="k-rail">
+      <header className="k-rail-head">
+        <h2>{title}</h2>
+      </header>
+      <ul className="k-rail-track">
+        {books.map((book) => (
+          <BookTile
+            key={book.id}
+            book={book}
+            variant="rail"
+            onRemove={() => onRemove(book)}
+          />
+        ))}
+      </ul>
+    </section>
+  );
 }
 
 export function LibraryShell() {
@@ -39,24 +149,16 @@ export function LibraryShell() {
     updateSettings,
   } = useLibrary();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [genre, setGenre] = useState<string>("All");
-  const [format, setFormat] = useState<FormatFilter>("all");
-  const [view, setView] = useState<LibraryView>("authors");
+  const [tab, setTab] = useState<Tab>("home");
   const [query, setQuery] = useState("");
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [genre, setGenre] = useState("All");
+  const [format, setFormat] = useState<FormatFilter>("all");
+  const [sort, setSort] = useState<SortKey>("recent");
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
-
-  useEffect(() => {
-    if (!settingsOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSettingsOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [settingsOpen]);
 
   useEffect(() => {
     const onDragOver = (e: DragEvent) => {
@@ -81,8 +183,6 @@ export function LibraryShell() {
     };
   }, [addFiles]);
 
-  const cont = useMemo(() => continueBook(books), [books]);
-
   const genres = useMemo(() => {
     const present = new Set(books.map((b) => b.shelf || "General"));
     return ["All", ...shelfOrder().filter((s) => present.has(s))];
@@ -104,325 +204,362 @@ export function LibraryShell() {
         return hay.includes(q);
       });
     }
-    return list;
-  }, [books, genre, format, query]);
+    return sortBooks(list, sort);
+  }, [books, genre, format, query, sort]);
 
-  const authorClubs = useMemo(() => clubByAuthor(filtered), [filtered]);
-  const genreClubs = useMemo(() => clubByGenre(filtered), [filtered]);
-  const multiAuthorCount = authorClubs.filter((c) => c.books.length > 1).length;
+  const continueReading = useMemo(
+    () =>
+      [...books]
+        .filter((b) => b.lastReadAt && b.progress < 0.98)
+        .sort((a, b) => b.lastReadAt.localeCompare(a.lastReadAt)),
+    [books],
+  );
+
+  const recentAdds = useMemo(
+    () =>
+      [...books]
+        .sort((a, b) => b.addedAt.localeCompare(a.addedAt))
+        .slice(0, 16),
+    [books],
+  );
+
+  const shelfRails = useMemo(() => {
+    return shelfOrder()
+      .map((shelf) => ({
+        shelf,
+        books: books.filter((b) => (b.shelf || "General") === shelf).slice(0, 12),
+      }))
+      .filter((row) => row.books.length > 0)
+      .slice(0, 4);
+  }, [books]);
+
+  const askRemove = (book: BookRecord) => {
+    if (confirm(`Remove “${book.title}” from this device?`)) {
+      void remove(book.id);
+    }
+  };
 
   if (!ready) {
     return (
-      <main className="ledger">
-        <p className="muted">Opening your library…</p>
+      <main className="k-app">
+        <p className="k-loading">Opening FOLIO…</p>
       </main>
     );
   }
 
   return (
-    <main className="ledger shelf-layout" data-profile={settings.profile}>
-      <header className="ledger-brand">
-        <div className="brand-row">
-          <p className="brand">FOLIO</p>
-          <button
-            type="button"
-            className="settings-gear"
-            aria-label="Settings"
-            aria-haspopup="dialog"
-            aria-expanded={settingsOpen}
-            onClick={() => setSettingsOpen(true)}
-          >
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
-            </svg>
-          </button>
-        </div>
-        <p className="tagline">A private reading machine.</p>
-        <p className="library-stats muted tiny">
-          {books.length} books · {clubByAuthor(books).length} writers
-          {multiAuthorCount
-            ? ` · ${multiAuthorCount} authors with collections`
-            : ""}
-        </p>
-      </header>
+    <main className="k-app">
+      {tab === "home" ? (
+        <div className="k-page">
+          <header className="k-top">
+            <h1>Home</h1>
+          </header>
+          <SearchField
+            value={query}
+            onChange={setQuery}
+            placeholder="Search FOLIO"
+          />
+          {genres.length > 1 ? (
+            <div className="k-pills" role="tablist" aria-label="Shelves">
+              {genres.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  className={genre === name ? "k-pill on" : "k-pill"}
+                  onClick={() => {
+                    setGenre(name);
+                    if (name !== "All") setTab("library");
+                  }}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
-      {cont ? (
-        <section className="ledger-section continue-section">
-          <h2>Continue</h2>
-          <Link className="continue-card" href={`/read/${cont.id}`}>
-            <div className="continue-cover">
-              <CoverThumb
-                id={cont.id}
-                title={cont.title}
-                authors={cont.authors}
-                format={cont.format}
-                hasCover={cont.hasCover}
+          {status ? <p className="k-status">{status}</p> : null}
+
+          {books.length === 0 ? (
+            <p className="k-empty">
+              {status ||
+                "Loading your library onto this device… Keep this tab open on Wi‑Fi."}
+            </p>
+          ) : null}
+
+          {continueReading[0] ? (
+            <section className="k-continue">
+              <h2>Continue</h2>
+              <Link className="k-continue-card" href={`/read/${continueReading[0].id}`}>
+                <div className="k-continue-cover">
+                  <CoverThumb
+                    id={continueReading[0].id}
+                    title={continueReading[0].title}
+                    authors={continueReading[0].authors}
+                    format={continueReading[0].format}
+                    hasCover={continueReading[0].hasCover}
+                  />
+                </div>
+                <div className="k-continue-copy">
+                  <span className="k-continue-title">{continueReading[0].title}</span>
+                  <span className="k-continue-meta">
+                    {pct(continueReading[0].progress)}
+                    {continueReading[0].chapterLabel
+                      ? ` · ${continueReading[0].chapterLabel}`
+                      : ""}
+                  </span>
+                </div>
+              </Link>
+            </section>
+          ) : null}
+
+          {query.trim() ? (
+            <CoverRail
+              title="Search results"
+              books={filtered.slice(0, 20)}
+              onRemove={askRemove}
+            />
+          ) : (
+            <>
+              <CoverRail
+                title="From your library"
+                books={recentAdds}
+                onRemove={askRemove}
               />
-            </div>
-            <div className="continue-copy">
-              <span className="continue-title">{cont.title}</span>
-              <span className="continue-meta">
-                {pct(cont.progress)}
-                {cont.chapterLabel ? ` · ${cont.chapterLabel}` : ""}
-                {cont.authors[0] ? ` · ${cont.authors[0]}` : ""}
-              </span>
-            </div>
-          </Link>
-        </section>
+              {continueReading.length > 1 ? (
+                <CoverRail
+                  title="Pick up where you left off"
+                  books={continueReading.slice(0, 12)}
+                  onRemove={askRemove}
+                />
+              ) : null}
+              {shelfRails.map((row) => (
+                <CoverRail
+                  key={row.shelf}
+                  title={row.shelf}
+                  books={row.books}
+                  onRemove={askRemove}
+                />
+              ))}
+            </>
+          )}
+        </div>
       ) : null}
 
-      <section className="ledger-section shelf-section">
-        <div className="section-row">
-          <h2>Gallery</h2>
-          <span className="muted">
-            {filtered.length}
-            {filtered.length !== books.length ? ` of ${books.length}` : ""}{" "}
-            titles
-          </span>
-        </div>
-
-        <div className="shelf-toolbar">
-          <label className="search-field">
-            <span className="sr-only">Search</span>
-            <input
-              type="search"
-              placeholder="Search title, author, or genre"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </label>
-
-          <div className="toolbar-label muted tiny">Genres</div>
-          <div className="filter-row genre-row" role="tablist" aria-label="Genre">
-            {genres.map((name) => (
+      {tab === "library" ? (
+        <div className="k-page">
+          <header className="k-top">
+            <h1>Library</h1>
+            <div className="k-top-actions">
               <button
-                key={name}
                 type="button"
-                role="tab"
-                aria-selected={genre === name}
-                className={genre === name ? "chip on" : "chip"}
-                onClick={() => setGenre(name)}
+                className={filtersOpen ? "k-icon-btn on" : "k-icon-btn"}
+                aria-label="Filters"
+                aria-expanded={filtersOpen}
+                onClick={() => setFiltersOpen((v) => !v)}
               >
-                {name}
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path
+                    d="M4 7h16M7 12h10M10 17h4"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    strokeLinecap="round"
+                  />
+                </svg>
               </button>
-            ))}
-          </div>
-
-          <div className="filter-row compact">
-            <div className="chip-group" role="tablist" aria-label="View">
-              {(
-                [
-                  ["authors", "By writer"],
-                  ["genres", "By genre"],
-                  ["gallery", "All covers"],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  role="tab"
-                  aria-selected={view === value}
-                  className={view === value ? "chip on" : "chip"}
-                  onClick={() => setView(value)}
+              <label className="k-icon-btn" aria-label="Sort">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path
+                    d="M8 5v14M8 5l-3 3M8 5l3 3M16 19V5M16 19l-3-3M16 19l3-3"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as SortKey)}
+                  aria-label="Sort books"
                 >
-                  {label}
-                </button>
-              ))}
+                  <option value="recent">Recent</option>
+                  <option value="title">Title</option>
+                  <option value="author">Author</option>
+                  <option value="progress">Progress</option>
+                </select>
+              </label>
             </div>
-            <div className="chip-group" role="group" aria-label="Format">
-              {(
-                [
-                  ["all", "All"],
-                  ["epub", "EPUB"],
-                  ["pdf", "PDF"],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  className={format === value ? "chip on" : "chip"}
-                  onClick={() => setFormat(value)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+          </header>
 
-        <div className="shelf-actions">
-          <button
-            type="button"
-            className="add-btn"
-            onClick={() => inputRef.current?.click()}
-          >
-            + Add books
-          </button>
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".epub,.pdf,.mobi,.azw3,.fb2,.cbz,application/epub+zip,application/pdf"
-            multiple
-            hidden
-            onChange={(e) => {
-              if (e.target.files?.length) void addFiles(e.target.files);
-              e.target.value = "";
-            }}
+          <SearchField
+            value={query}
+            onChange={setQuery}
+            placeholder="Search FOLIO"
           />
-          {status ? <p className="status">{status}</p> : null}
-        </div>
 
-        {filtered.length === 0 ? (
-          <p className="muted empty-copy">
-            {books.length === 0
-              ? status
-                ? status
-                : "Loading your library onto this device… Keep this tab open on Wi‑Fi."
-              : "No books match these filters."}
-          </p>
-        ) : null}
-
-        {filtered.length > 0 && view === "authors" ? (
-          <div className="author-gallery">
-            {authorClubs.map((club) => (
-              <section key={club.key} className="author-club">
-                <header className="author-club-head">
-                  <h3>{club.author}</h3>
-                  <span className="muted tiny">
-                    {club.books.length}{" "}
-                    {club.books.length === 1 ? "book" : "books"}
-                    {club.books[0]?.shelf ? ` · ${club.books[0].shelf}` : ""}
-                  </span>
-                </header>
-                <ul
-                  className={
-                    club.books.length > 1
-                      ? "bookshelf author-rail"
-                      : "bookshelf author-rail single"
-                  }
-                >
-                  {club.books.map((book) => (
-                    <BookTile
-                      key={book.id}
-                      book={book}
-                      compact={club.books.length > 1}
-                      onRemove={() => {
-                        if (confirm(`Remove “${book.title}” from this device?`)) {
-                          void remove(book.id);
-                        }
-                      }}
-                    />
+          {filtersOpen ? (
+            <div className="k-filters">
+              <div className="k-filter-block">
+                <p className="k-filter-label">Shelf</p>
+                <div className="k-pills">
+                  {genres.map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      className={genre === name ? "k-pill on" : "k-pill"}
+                      onClick={() => setGenre(name)}
+                    >
+                      {name}
+                    </button>
                   ))}
-                </ul>
-              </section>
-            ))}
-          </div>
-        ) : null}
+                </div>
+              </div>
+              <div className="k-filter-block">
+                <p className="k-filter-label">Format</p>
+                <div className="k-pills">
+                  {(
+                    [
+                      ["all", "All"],
+                      ["epub", "EPUB"],
+                      ["pdf", "PDF"],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={format === value ? "k-pill on" : "k-pill"}
+                      onClick={() => setFormat(value)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
 
-        {filtered.length > 0 && view === "genres" ? (
-          <div className="genre-gallery">
-            {genreClubs.map((g) => (
-              <section key={g.genre} className="genre-club">
-                <header className="genre-club-head">
-                  <h3>{g.genre}</h3>
-                  <span className="muted tiny">
-                    {g.bookCount} titles · {g.authors.length} writers
-                  </span>
-                </header>
-                {g.authors.map((club) => (
-                  <div key={`${g.genre}-${club.key}`} className="author-club nested">
-                    <header className="author-club-head compact">
-                      <h4>{club.author}</h4>
-                      <span className="muted tiny">
-                        {club.books.length}{" "}
-                        {club.books.length === 1 ? "book" : "books"}
-                      </span>
-                    </header>
-                    <ul className="bookshelf author-rail">
-                      {club.books.map((book) => (
-                        <BookTile
-                          key={book.id}
-                          book={book}
-                          compact
-                          onRemove={() => {
-                            if (
-                              confirm(`Remove “${book.title}” from this device?`)
-                            ) {
-                              void remove(book.id);
-                            }
-                          }}
-                        />
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </section>
-            ))}
-          </div>
-        ) : null}
+          {status ? <p className="k-status">{status}</p> : null}
 
-        {filtered.length > 0 && view === "gallery" ? (
-          <ul className="bookshelf">
-            {filtered
-              .slice()
-              .sort((a, b) => a.title.localeCompare(b.title))
-              .map((book) => (
+          {filtered.length === 0 ? (
+            <p className="k-empty">
+              {books.length === 0
+                ? status ||
+                  "Loading your library onto this device… Keep this tab open on Wi‑Fi."
+                : "No books match these filters."}
+            </p>
+          ) : (
+            <ul className="k-grid">
+              {filtered.map((book) => (
                 <BookTile
                   key={book.id}
                   book={book}
-                  onRemove={() => {
-                    if (confirm(`Remove “${book.title}” from this device?`)) {
-                      void remove(book.id);
-                    }
-                  }}
+                  variant="cover"
+                  onRemove={() => askRemove(book)}
                 />
               ))}
-          </ul>
-        ) : null}
-      </section>
-
-      {settingsOpen ? (
-        <div
-          className="settings-overlay"
-          role="presentation"
-          onClick={() => setSettingsOpen(false)}
-        >
-          <div
-            className="settings-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Reading settings"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="settings-dialog-head">
-              <h2>Settings</h2>
-              <button
-                type="button"
-                className="ghost-btn"
-                onClick={() => setSettingsOpen(false)}
-              >
-                Close
-              </button>
-            </div>
-            <ReadingSettingsForm
-              settings={settings}
-              onChange={(patch) => void updateSettings(patch)}
-            />
-            <p className="muted tiny settings-usage">{usageLabel}</p>
-          </div>
+            </ul>
+          )}
         </div>
       ) : null}
+
+      {tab === "more" ? (
+        <div className="k-page">
+          <header className="k-top">
+            <h1>More</h1>
+          </header>
+          <SearchField
+            value={query}
+            onChange={(v) => {
+              setQuery(v);
+              if (v.trim()) setTab("library");
+            }}
+            placeholder="Search FOLIO"
+          />
+
+          <section className="k-more-block">
+            <h2>Your library</h2>
+            <button
+              type="button"
+              className="k-more-row"
+              onClick={() => inputRef.current?.click()}
+            >
+              <span>Add books</span>
+              <span className="k-more-meta">EPUB, PDF…</span>
+            </button>
+            <button
+              type="button"
+              className="k-more-row"
+              onClick={() => {
+                window.location.href = "/?seed=1";
+              }}
+            >
+              <span>Reload from GitHub</span>
+              <span className="k-more-meta">Re-import catalog</span>
+            </button>
+            <div className="k-more-row static">
+              <span>On this device</span>
+              <span className="k-more-meta">
+                {books.length} books · {usageLabel}
+              </span>
+            </div>
+          </section>
+
+          <section className="k-more-block">
+            <h2>Reading</h2>
+            <div className="k-more-settings">
+              <ReadingSettingsForm
+                settings={settings}
+                onChange={(patch) => void updateSettings(patch)}
+              />
+            </div>
+          </section>
+
+          <section className="k-more-block">
+            <h2>About</h2>
+            <p className="k-about">
+              FOLIO is Ubaid’s local Kindle — books stay in this browser’s storage
+              until you clear site data.
+            </p>
+          </section>
+
+          {status ? <p className="k-status">{status}</p> : null}
+        </div>
+      ) : null}
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".epub,.pdf,.mobi,.azw3,.fb2,.cbz,application/epub+zip,application/pdf"
+        multiple
+        hidden
+        onChange={(e) => {
+          if (e.target.files?.length) void addFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
+
+      <nav className="k-tabbar" aria-label="Primary">
+        {(
+          [
+            ["home", "Home", IconHome],
+            ["library", "Library", IconLibrary],
+            ["more", "More", IconMore],
+          ] as const
+        ).map(([id, label, Icon]) => {
+          const active = tab === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              className={active ? "k-tab on" : "k-tab"}
+              aria-current={active ? "page" : undefined}
+              onClick={() => setTab(id)}
+            >
+              <Icon active={active} />
+              <span>{label}</span>
+            </button>
+          );
+        })}
+      </nav>
 
       <div className="drop-veil" aria-hidden>
         Drop books to import

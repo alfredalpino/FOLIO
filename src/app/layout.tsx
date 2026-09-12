@@ -1,5 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Mono, Literata, Source_Serif_4 } from "next/font/google";
+import {
+  IBM_Plex_Mono,
+  IBM_Plex_Sans,
+  Literata,
+  Source_Serif_4,
+} from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import "./globals.css";
 
@@ -15,6 +20,13 @@ const body = Source_Serif_4({
   display: "swap",
 });
 
+const ui = IBM_Plex_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-ui",
+  display: "swap",
+});
+
 const mono = IBM_Plex_Mono({
   subsets: ["latin"],
   weight: ["400", "500"],
@@ -25,11 +37,11 @@ const mono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "FOLIO",
   description:
-    "A private, local-first, e-ink-inspired reading machine. Books stay on your device.",
+    "Ubaid’s private, local-first Kindle. Books stay on your device.",
   applicationName: "FOLIO",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "FOLIO",
   },
   formatDetection: {
@@ -42,10 +54,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f6f3eb" },
-    { media: "(prefers-color-scheme: dark)", color: "#1c1917" },
-  ],
+  themeColor: "#000000",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -61,7 +70,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${display.variable} ${body.variable} ${mono.variable}`}
+      className={`${display.variable} ${body.variable} ${ui.variable} ${mono.variable}`}
     >
       <body>
         {children}
