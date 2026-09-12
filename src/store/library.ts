@@ -13,17 +13,17 @@ import { normalizeLibraryBooks } from "@/lib/normalize-library";
 import type { AppSettings, BookRecord } from "@/lib/types";
 import { DEFAULT_SETTINGS } from "@/lib/types";
 
-const SEED_FLAG = "folio-local-books-seeded-v2";
-const SEED_PROGRESS = "folio-local-books-seed-progress-v2";
+/** Bumped so phones stuck on the broken v2 empty-loop re-seed once correctly. */
+const SEED_FLAG = "folio-local-books-seeded-v3";
+const SEED_PROGRESS = "folio-local-books-seed-progress-v3";
+const LFS_PREFIX = "version https://git-lfs.github.com/spec/v1";
 let seedInFlight: Promise<void> | null = null;
 
 function migrateLegacyFlags() {
   if (typeof window === "undefined") return;
+  // Do not migrate seeded-v2 → v3: v2 was often set after failed empty imports
+  // and must not block the one-time fixed reseed.
   const pairs: Array<[string, string]> = [
-    ["folio-local-books-seeded-v1", SEED_FLAG],
-    ["folio-local-books-seed-progress-v1", SEED_PROGRESS],
-    ["paper-local-books-seeded-v2", SEED_FLAG],
-    ["paper-local-books-seed-progress-v2", SEED_PROGRESS],
     ["paper-meta-normalized-v5", "folio-meta-normalized-v1"],
     ["paper-meta-normalized-v4", "folio-meta-normalized-v1"],
     ["paper-meta-normalized-v3", "folio-meta-normalized-v1"],
@@ -56,66 +56,114 @@ function formatUsage(usage?: number, quota?: number) {
   return `${used} MB of ~${(quota / 1048576).toFixed(0)} MB used locally`;
 }
 
+function looksLikeLfsPointer(blob: Blob) {
+  // Pointers are ~120–140 bytes; never treat huge files as pointers.
+  if (blob.size >= 500) return false;
+  return blob
+    .slice(0, 80)
+    .text()
+    .then((text) => text.startsWith(LFS_PREFIX))
+    .catch(() => false);
+}
+
 async function runSeed(
   refresh: () => Promise<void>,
   setStatus: (s: string) => void,
   libraryCount: number,
 ) {
   const params = new URLSearchParams(window.location.search);
-  if (params.get("seed") === "1") {
+  const forceSeed = params.get("seed") === "1";
+  if (forceSeed) {
     window.localStorage.removeItem(SEED_FLAG);
     window.localStorage.removeItem(SEED_PROGRESS);
   }
 
-  // Always (re)seed when the library is empty, even if a prior flag was set.
-  if (libraryCount === 0) {
-    window.localStorage.removeItem(SEED_FLAG);
-  } else if (window.localStorage.getItem(SEED_FLAG) === "1") {
+  // Offline-first: once books are on this device, never auto-download again.
+  if (libraryCount > 0) {
+    window.localStorage.setItem(SEED_FLAG, "1");
+    window.localStorage.removeItem(SEED_PROGRESS);
+    return;
+  }
+
+  // Empty library after a finished seed attempt → stay empty until user
+  // clears site data or opens with ?seed=1. Prevents the refresh countdown loop.
+  if (!forceSeed && window.localStorage.getItem(SEED_FLAG) === "1") {
     return;
   }
 
   const listRes = await fetch("/api/local-books");
-  if (!listRes.ok) return;
+  if (!listRes.ok) {
+    setStatus("Library catalog unavailable");
+    window.localStorage.setItem(SEED_FLAG, "1");
+    return;
+  }
   const payload = (await listRes.json()) as {
-    books: Array<{ path: string; name: string }>;
+    books: Array<{ path: string; name: string; size?: number; lfs?: boolean }>;
+    error?: string;
   };
   const entries = payload.books || [];
   if (!entries.length) {
     window.localStorage.setItem(SEED_FLAG, "1");
+    setStatus("");
     return;
   }
 
+  let imported = 0;
+  let failed = 0;
   const startAt = Number(window.localStorage.getItem(SEED_PROGRESS) || "0");
+
   for (let i = Math.max(0, startAt); i < entries.length; i += 1) {
     const entry = entries[i];
     setStatus(`Loading library ${i + 1}/${entries.length}…`);
-    const fileRes = await fetch(
-      `/api/local-books/file?path=${encodeURIComponent(entry.path)}`,
-    );
-    if (!fileRes.ok) {
-      window.localStorage.setItem(SEED_PROGRESS, String(i + 1));
-      continue;
-    }
-    const blob = await fileRes.blob();
-    const file = new File([blob], entry.name, {
-      type: blob.type || "application/octet-stream",
-    });
     try {
+      const fileRes = await fetch(
+        `/api/local-books/file?path=${encodeURIComponent(entry.path)}`,
+      );
+      if (!fileRes.ok) {
+        failed += 1;
+        window.localStorage.setItem(SEED_PROGRESS, String(i + 1));
+        continue;
+      }
+      const blob = await fileRes.blob();
+      if (blob.size < 500 || (await looksLikeLfsPointer(blob))) {
+        failed += 1;
+        console.error("Skipping LFS pointer / empty payload", entry.name, blob.size);
+        window.localStorage.setItem(SEED_PROGRESS, String(i + 1));
+        continue;
+      }
+      const file = new File([blob], entry.name, {
+        type: blob.type || "application/octet-stream",
+      });
       await importBookFile(file);
+      imported += 1;
     } catch (error) {
+      failed += 1;
       console.error("Failed to import", entry.name, error);
     }
     window.localStorage.setItem(SEED_PROGRESS, String(i + 1));
-    if (i % 2 === 1 || i === entries.length - 1) {
+    if (imported > 0 && (imported % 2 === 0 || i === entries.length - 1)) {
       await refresh();
     }
   }
 
+  // Always mark finished so refresh does not replay the countdown.
   window.localStorage.setItem(SEED_FLAG, "1");
   window.localStorage.removeItem(SEED_PROGRESS);
-  await normalizeLibraryBooks(true);
-  await refresh();
-  setStatus("");
+
+  if (imported > 0) {
+    await normalizeLibraryBooks(true);
+    await refresh();
+    setStatus(
+      failed
+        ? `Loaded ${imported} books (${failed} skipped)`
+        : `Loaded ${imported} books`,
+    );
+    window.setTimeout(() => setStatus(""), 2800);
+  } else {
+    setStatus(
+      "Could not load books from the server. Open with ?seed=1 after fixing FOLIO_GITHUB_TOKEN, or add files manually.",
+    );
+  }
 }
 
 async function seedLocalBooks(

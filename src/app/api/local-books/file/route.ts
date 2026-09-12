@@ -2,7 +2,7 @@ import { assertBooksAvailable, openLocalBookStream } from "@/lib/local-books-fs"
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-/** Large PDFs from the repo `books/` folder need a long-lived Node function. */
+/** Large PDFs from GitHub LFS need a long-lived Node function. */
 export const maxDuration = 300;
 
 export async function GET(request: Request) {
@@ -24,10 +24,14 @@ export async function GET(request: Request) {
         "Content-Length": String(file.size),
         "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(file.name)}`,
         "Cache-Control": "private, max-age=3600",
+        "X-Folio-Book-Source": file.source,
       },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Not found";
-    return Response.json({ error: message }, { status: 404 });
+    const status = /FOLIO_GITHUB_TOKEN|LFS pointer|GitHub/i.test(message)
+      ? 503
+      : 404;
+    return Response.json({ error: message }, { status });
   }
 }
