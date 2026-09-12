@@ -97,6 +97,70 @@ button {
   margin-bottom: 3rem;
 }
 
+.brand-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.settings-gear {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--fg);
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  margin-top: 0.35rem;
+  cursor: pointer;
+}
+
+.settings-gear:hover {
+  border-color: var(--fg);
+}
+
+.settings-gear:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+}
+
+.settings-dialog {
+  width: min(24rem, 100%);
+  background: var(--card);
+  border: 1px solid var(--line);
+  padding: 1.25rem 1.2rem 1.1rem;
+  box-shadow: 0 18px 40px color-mix(in srgb, var(--fg) 12%, transparent);
+}
+
+.settings-dialog-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+}
+
+.settings-dialog-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
 .brand {
   margin: 0;
   font-family: var(--font-display);
@@ -639,13 +703,6 @@ button {
   flex-direction: row;
   align-items: center;
   gap: 0.65rem;
-}
-
-.ledger-foot {
-  margin-top: 3rem;
-  color: var(--muted);
-  font-size: 0.9rem;
-  line-height: 1.5;
 }
 
 .drop-veil {

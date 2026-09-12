@@ -43,10 +43,20 @@ export function LibraryShell() {
   const [format, setFormat] = useState<FormatFilter>("all");
   const [view, setView] = useState<LibraryView>("authors");
   const [query, setQuery] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSettingsOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [settingsOpen]);
 
   useEffect(() => {
     const onDragOver = (e: DragEvent) => {
@@ -112,7 +122,32 @@ export function LibraryShell() {
   return (
     <main className="ledger shelf-layout" data-profile={settings.profile}>
       <header className="ledger-brand">
-        <p className="brand">FOLIO</p>
+        <div className="brand-row">
+          <p className="brand">FOLIO</p>
+          <button
+            type="button"
+            className="settings-gear"
+            aria-label="Settings"
+            aria-haspopup="dialog"
+            aria-expanded={settingsOpen}
+            onClick={() => setSettingsOpen(true)}
+          >
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+            </svg>
+          </button>
+        </div>
         <p className="tagline">A private reading machine.</p>
         <InstallAppButton />
         <p className="library-stats muted tiny">
@@ -356,68 +391,85 @@ export function LibraryShell() {
         ) : null}
       </section>
 
-      <section className="ledger-section settings-block">
-        <h2>Reading</h2>
-        <label className="field">
-          <span>Profile</span>
-          <select
-            value={settings.profile}
-            onChange={(e) =>
-              void updateSettings({
-                profile: e.target.value as ReadingProfile,
-              })
-            }
+      {settingsOpen ? (
+        <div
+          className="settings-overlay"
+          role="presentation"
+          onClick={() => setSettingsOpen(false)}
+        >
+          <div
+            className="settings-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Reading settings"
+            onClick={(e) => e.stopPropagation()}
           >
-            <option value="paper">Cream</option>
-            <option value="newspaper">Newspaper</option>
-            <option value="night">Night</option>
-            <option value="terminal">Terminal</option>
-          </select>
-        </label>
-        <label className="field">
-          <span>Page refresh</span>
-          <select
-            value={settings.refresh}
-            onChange={(e) =>
-              void updateSettings({
-                refresh: e.target.value as RefreshProfile,
-              })
-            }
-          >
-            <option value="paper">Instant</option>
-            <option value="kindle">Kindle</option>
-            <option value="eink">E-Ink flash</option>
-            <option value="ghosting">Ghosting</option>
-          </select>
-        </label>
-        <label className="field check">
-          <input
-            type="checkbox"
-            checked={settings.wakeLock}
-            onChange={(e) =>
-              void updateSettings({ wakeLock: e.target.checked })
-            }
-          />
-          <span>Keep screen awake while reading</span>
-        </label>
-        <label className="field check">
-          <input
-            type="checkbox"
-            checked={settings.volumeKeys}
-            onChange={(e) =>
-              void updateSettings({ volumeKeys: e.target.checked })
-            }
-          />
-          <span>Volume keys turn pages (Android)</span>
-        </label>
-        <p className="muted tiny">{usageLabel}. Airplane mode works.</p>
-      </section>
-
-      <footer className="ledger-foot">
-        <p>
-          Local-first. Writers are clubbed together. Genres stay on the shelf.
-        </p>
-      </footer>
+            <div className="settings-dialog-head">
+              <h2>Settings</h2>
+              <button
+                type="button"
+                className="ghost-btn"
+                onClick={() => setSettingsOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+            <label className="field">
+              <span>Profile</span>
+              <select
+                value={settings.profile}
+                onChange={(e) =>
+                  void updateSettings({
+                    profile: e.target.value as ReadingProfile,
+                  })
+                }
+              >
+                <option value="paper">Cream</option>
+                <option value="newspaper">Newspaper</option>
+                <option value="night">Night</option>
+                <option value="terminal">Terminal</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Page refresh</span>
+              <select
+                value={settings.refresh}
+                onChange={(e) =>
+                  void updateSettings({
+                    refresh: e.target.value as RefreshProfile,
+                  })
+                }
+              >
+                <option value="paper">Instant</option>
+                <option value="kindle">Kindle</option>
+                <option value="eink">E-Ink flash</option>
+                <option value="ghosting">Ghosting</option>
+              </select>
+            </label>
+            <label className="field check">
+              <input
+                type="checkbox"
+                checked={settings.wakeLock}
+                onChange={(e) =>
+                  void updateSettings({ wakeLock: e.target.checked })
+                }
+              />
+              <span>Keep screen awake while reading</span>
+            </label>
+            <label className="field check">
+              <input
+                type="checkbox"
+                checked={settings.volumeKeys}
+                onChange={(e) =>
+                  void updateSettings({ volumeKeys: e.target.checked })
+                }
+              />
+              <span>Volume keys turn pages (Android)</span>
+            </label>
+            <p className="muted tiny">{usageLabel}</p>
+          </div>
+        </div>
+      ) : null}
 
       <div className="drop-veil" aria-hidden>
         Drop books to import
