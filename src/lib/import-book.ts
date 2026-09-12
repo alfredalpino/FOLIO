@@ -8,7 +8,9 @@ type FoliateBook = {
   getCover?: () => Promise<Blob | null | undefined>;
 };
 
-async function loadMakeBook(): Promise<(file: File | Blob) => Promise<FoliateBook>> {
+async function loadMakeBook(): Promise<
+  (file: File | Blob) => Promise<FoliateBook>
+> {
   const mod = (await import(
     /* webpackIgnore: true */
     "/vendor/foliate-js/view.js" as string
@@ -26,48 +28,16 @@ function detectFormat(file: File): string {
   return "epub";
 }
 
-export async function importBookFile(file: File): Promise<BookRecord> {
-  const id = await hashFile(file);
-  const existing = await getBook(id);
-  if (existing) return existing;
-
-  const makeBook = await loadMakeBook();
-  const book = await makeBook(file);
-  const m = book.metadata || {};
-
-  let coverBlob: Blob | null = null;
-  try {
-    coverBlob = (await book.getCover?.()) || null;
-  } catch {
-    coverBlob = null;
-  }
-
-  const metaTitle = fmtLangMap(m.title);
-  const subtitle = m.subtitle ? String(m.subtitle) : "";
-  const resolved = resolveDisplayTitle(metaTitle, file.name);
-  const metaAuthors = fmtContributors(m.author);
-  const authors =
-    metaAuthors.length > 0 && !resolved.usedFileName
-      ? metaAuthors
-      : resolved.authors.length
-        ? resolved.authors
-        : metaAuthors;
-
-  let title = resolved.title;
-  if (subtitle && !resolved.usedFileName && !title.includes(subtitle)) {
-    title = `${title}: ${subtitle}`;
-  }
-
-  const record: BookRecord = {
+function recordFromFileName(file: File, id: string): BookRecord {
+  const resolved = resolveDisplayTitle("", file.name);
+  return {
     id,
-    title,
-    authors,
-    language: Array.isArray(m.language)
-      ? String(m.language[0] || "")
-      : fmtLangMap(m.language),
-    publisher: fmtContributors(m.publisher)[0] || "",
-    published: m.published ? String(m.published) : "",
-    description: fmtLangMap(m.description),
+    title: resolved.title,
+    authors: resolved.authors,
+    language: "",
+    publisher: "",
+    published: "",
+    description: "",
     fileName: file.name,
     format: detectFormat(file),
     size: file.size,
@@ -75,9 +45,76 @@ export async function importBookFile(file: File): Promise<BookRecord> {
     lastReadAt: "",
     progress: 0,
     chapterLabel: "",
-    hasCover: Boolean(coverBlob),
-    shelf: inferShelf(file.name, title, authors),
+    hasCover: false,
+    shelf: inferShelf(file.name, resolved.title, resolved.authors),
   };
+}
+
+export async function importBookFile(file: File): Promise<BookRecord> {
+  if (file.size < 500) {
+    throw new Error(`File too small to be a book (${file.size} bytes)`);
+  }
+
+  const id = await hashFile(file);
+  const existing = await getBook(id);
+  if (existing) return existing;
+
+  let coverBlob: Blob | null = null;
+  let record: BookRecord;
+
+  try {
+    const makeBook = await loadMakeBook();
+    const book = await makeBook(file);
+    const m = book.metadata || {};
+
+    try {
+      coverBlob = (await book.getCover?.()) || null;
+    } catch {
+      coverBlob = null;
+    }
+
+    const metaTitle = fmtLangMap(m.title);
+    const subtitle = m.subtitle ? String(m.subtitle) : "";
+    const resolved = resolveDisplayTitle(metaTitle, file.name);
+    const metaAuthors = fmtContributors(m.author);
+    const authors =
+      metaAuthors.length > 0 && !resolved.usedFileName
+        ? metaAuthors
+        : resolved.authors.length
+          ? resolved.authors
+          : metaAuthors;
+
+    let title = resolved.title;
+    if (subtitle && !resolved.usedFileName && !title.includes(subtitle)) {
+      title = `${title}: ${subtitle}`;
+    }
+
+    record = {
+      id,
+      title,
+      authors,
+      language: Array.isArray(m.language)
+        ? String(m.language[0] || "")
+        : fmtLangMap(m.language),
+      publisher: fmtContributors(m.publisher)[0] || "",
+      published: m.published ? String(m.published) : "",
+      description: fmtLangMap(m.description),
+      fileName: file.name,
+      format: detectFormat(file),
+      size: file.size,
+      addedAt: new Date().toISOString(),
+      lastReadAt: "",
+      progress: 0,
+      chapterLabel: "",
+      hasCover: Boolean(coverBlob),
+      shelf: inferShelf(file.name, title, authors),
+    };
+  } catch (error) {
+    // Still persist the binary so the library works offline even if Foliate
+    // cannot parse metadata on this device (common for some PDFs on mobile).
+    console.warn("Foliate parse failed; saving with filename metadata", file.name, error);
+    record = recordFromFileName(file, id);
+  }
 
   await saveImportedBook(record, file, coverBlob);
   return record;
