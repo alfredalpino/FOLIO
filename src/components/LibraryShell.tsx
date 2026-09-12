@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BookTile } from "@/components/BookTile";
 import { CoverThumb } from "@/components/CoverThumb";
-import { InstallAppButton } from "@/components/InstallAppButton";
 import { shelfOrder } from "@/lib/book-meta";
 import {
   clubByAuthor,
@@ -149,7 +148,6 @@ export function LibraryShell() {
           </button>
         </div>
         <p className="tagline">A private reading machine.</p>
-        <InstallAppButton />
         <p className="library-stats muted tiny">
           {books.length} books · {clubByAuthor(books).length} writers
           {multiAuthorCount
