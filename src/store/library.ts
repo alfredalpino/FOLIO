@@ -8,9 +8,13 @@ import {
   saveSettings,
   storageEstimate,
 } from "@/lib/db";
-import { importBookFiles } from "@/lib/import-book";
+import { importBookFile, importBookFiles } from "@/lib/import-book";
 import type { AppSettings, BookRecord } from "@/lib/types";
 import { DEFAULT_SETTINGS } from "@/lib/types";
+
+const SEED_FLAG = "paper-local-books-seeded-v2";
+const SEED_PROGRESS = "paper-local-books-seed-progress-v2";
+let seedInFlight: Promise<void> | null = null;
 
 interface LibraryState {
   ready: boolean;
@@ -32,6 +36,77 @@ function formatUsage(usage?: number, quota?: number) {
   return `${used} MB of ~${(quota / 1048576).toFixed(0)} MB used locally`;
 }
 
+async function runSeed(refresh: () => Promise<void>, setStatus: (s: string) => void) {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("seed") === "1") {
+    window.localStorage.removeItem(SEED_FLAG);
+    window.localStorage.removeItem(SEED_PROGRESS);
+  }
+
+  if (window.localStorage.getItem(SEED_FLAG) === "1") return;
+
+  const listRes = await fetch("/api/local-books");
+  if (!listRes.ok) return;
+  const payload = (await listRes.json()) as {
+    books: Array<{ path: string; name: string }>;
+  };
+  const entries = payload.books || [];
+  if (!entries.length) {
+    window.localStorage.setItem(SEED_FLAG, "1");
+    return;
+  }
+
+  const startAt = Number(window.localStorage.getItem(SEED_PROGRESS) || "0");
+  for (let i = Math.max(0, startAt); i < entries.length; i += 1) {
+    const entry = entries[i];
+    setStatus(`Loading library ${i + 1}/${entries.length}…`);
+    const fileRes = await fetch(
+      `/api/local-books/file?path=${encodeURIComponent(entry.path)}`,
+    );
+    if (!fileRes.ok) {
+      window.localStorage.setItem(SEED_PROGRESS, String(i + 1));
+      continue;
+    }
+    const blob = await fileRes.blob();
+    const file = new File([blob], entry.name, {
+      type: blob.type || "application/octet-stream",
+    });
+    try {
+      await importBookFile(file);
+    } catch (error) {
+      console.error("Failed to import", entry.name, error);
+    }
+    window.localStorage.setItem(SEED_PROGRESS, String(i + 1));
+    if (i % 2 === 1 || i === entries.length - 1) {
+      await refresh();
+    }
+  }
+
+  window.localStorage.setItem(SEED_FLAG, "1");
+  window.localStorage.removeItem(SEED_PROGRESS);
+  setStatus("");
+}
+
+async function seedLocalBooks(refresh: () => Promise<void>, setStatus: (s: string) => void) {
+  if (typeof window === "undefined") return;
+  if (seedInFlight) return seedInFlight;
+
+  const execute = async () => {
+    if (typeof navigator !== "undefined" && "locks" in navigator) {
+      await navigator.locks.request("paper-local-book-seed", () =>
+        runSeed(refresh, setStatus),
+      );
+      return;
+    }
+    await runSeed(refresh, setStatus);
+  };
+
+  seedInFlight = execute().finally(() => {
+    seedInFlight = null;
+  });
+  return seedInFlight;
+}
+
 export const useLibrary = create<LibraryState>((set, get) => ({
   ready: false,
   books: [],
@@ -49,6 +124,14 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       books,
       settings,
       usageLabel: formatUsage(estimate.usage, estimate.quota),
+    });
+    // Agent-seeded local books land in IndexedDB without any Drive UI.
+    void seedLocalBooks(
+      () => get().refresh(),
+      (status) => set({ status }),
+    ).catch((error) => {
+      console.error(error);
+      set({ status: "" });
     });
   },
   refresh: async () => {
