@@ -40,6 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local user books — never commit
-/books/
+# local logs only
 /logs/
+
+# Unpacked EPUB trees (directories named *.epub) — keep only archive files
+/books/100M Money Models.epub/
+/books/Mathematical Thinking - for People Who Hate Math Level Up Your Analytical and Creative Thinking Skills Excel at Problem-Solving and Decision-Making.epub/
