@@ -1,5 +1,6 @@
 import { hashFile, saveImportedBook, getBook } from "./db";
 import { fmtContributors, fmtLangMap } from "./profiles";
+import { inferShelf, resolveDisplayTitle } from "./book-meta";
 import type { BookRecord } from "./types";
 
 type FoliateBook = {
@@ -41,14 +42,26 @@ export async function importBookFile(file: File): Promise<BookRecord> {
     coverBlob = null;
   }
 
-  const title =
-    fmtLangMap(m.title) || file.name.replace(/\.(epub|pdf|mobi|azw3|fb2|cbz)$/i, "");
+  const metaTitle = fmtLangMap(m.title);
   const subtitle = m.subtitle ? String(m.subtitle) : "";
+  const resolved = resolveDisplayTitle(metaTitle, file.name);
+  const metaAuthors = fmtContributors(m.author);
+  const authors =
+    metaAuthors.length > 0 && !resolved.usedFileName
+      ? metaAuthors
+      : resolved.authors.length
+        ? resolved.authors
+        : metaAuthors;
+
+  let title = resolved.title;
+  if (subtitle && !resolved.usedFileName && !title.includes(subtitle)) {
+    title = `${title}: ${subtitle}`;
+  }
 
   const record: BookRecord = {
     id,
-    title: subtitle ? `${title}: ${subtitle}` : title,
-    authors: fmtContributors(m.author),
+    title,
+    authors,
     language: Array.isArray(m.language)
       ? String(m.language[0] || "")
       : fmtLangMap(m.language),
@@ -63,6 +76,7 @@ export async function importBookFile(file: File): Promise<BookRecord> {
     progress: 0,
     chapterLabel: "",
     hasCover: Boolean(coverBlob),
+    shelf: inferShelf(file.name, title, authors),
   };
 
   await saveImportedBook(record, file, coverBlob);

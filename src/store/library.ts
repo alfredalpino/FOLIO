@@ -9,6 +9,7 @@ import {
   storageEstimate,
 } from "@/lib/db";
 import { importBookFile, importBookFiles } from "@/lib/import-book";
+import { normalizeLibraryBooks } from "@/lib/normalize-library";
 import type { AppSettings, BookRecord } from "@/lib/types";
 import { DEFAULT_SETTINGS } from "@/lib/types";
 
@@ -84,6 +85,8 @@ async function runSeed(refresh: () => Promise<void>, setStatus: (s: string) => v
 
   window.localStorage.setItem(SEED_FLAG, "1");
   window.localStorage.removeItem(SEED_PROGRESS);
+  await normalizeLibraryBooks(true);
+  await refresh();
   setStatus("");
 }
 
@@ -114,6 +117,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
   status: "",
   usageLabel: "",
   hydrate: async () => {
+    const changed = await normalizeLibraryBooks();
     const [books, settings, estimate] = await Promise.all([
       listBooks(),
       getSettings(),
@@ -124,7 +128,13 @@ export const useLibrary = create<LibraryState>((set, get) => ({
       books,
       settings,
       usageLabel: formatUsage(estimate.usage, estimate.quota),
+      status: changed ? `Organized ${changed} titles` : "",
     });
+    if (changed) {
+      window.setTimeout(() => {
+        if (get().status.startsWith("Organized")) set({ status: "" });
+      }, 2200);
+    }
     // Agent-seeded local books land in IndexedDB without any Drive UI.
     void seedLocalBooks(
       () => get().refresh(),

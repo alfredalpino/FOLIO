@@ -71,6 +71,10 @@ export async function saveImportedBook(
   });
 }
 
+export async function updateBook(book: BookRecord) {
+  await db.books.put(book);
+}
+
 export async function deleteBook(id: string) {
   await db.transaction(
     "rw",
