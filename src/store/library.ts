@@ -78,18 +78,22 @@ async function runSeed(
     window.localStorage.removeItem(SEED_PROGRESS);
   }
 
-  // Offline-first: once books are on this device, never auto-download again.
-  if (libraryCount > 0) {
-    window.localStorage.setItem(SEED_FLAG, "1");
-    window.localStorage.removeItem(SEED_PROGRESS);
+  const seeded = window.localStorage.getItem(SEED_FLAG) === "1";
+  const inProgress = window.localStorage.getItem(SEED_PROGRESS);
+
+  // Finished seed (success or hard-fail): never auto-download again.
+  // Clear site data or open with ?seed=1 to reload from GitHub.
+  if (seeded && !forceSeed) {
     return;
   }
 
-  // Empty library after a finished seed attempt → stay empty until user
-  // clears site data or opens with ?seed=1. Prevents the refresh countdown loop.
-  if (!forceSeed && window.localStorage.getItem(SEED_FLAG) === "1") {
+  // Books already on device and no interrupted seed → stay offline.
+  if (libraryCount > 0 && !inProgress && !forceSeed) {
+    window.localStorage.setItem(SEED_FLAG, "1");
     return;
   }
+
+  // Otherwise: empty library, or resume after a mid-seed refresh.
 
   const listRes = await fetch("/api/local-books");
   if (!listRes.ok) {
