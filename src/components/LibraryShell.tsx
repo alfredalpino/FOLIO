@@ -286,7 +286,9 @@ export function LibraryShell() {
         {filtered.length === 0 ? (
           <p className="muted empty-copy">
             {books.length === 0
-              ? "Drop an EPUB or PDF here. It stays on this device."
+              ? status
+                ? status
+                : "Loading your library onto this device… Keep this tab open on Wi‑Fi."
               : "No books match these filters."}
           </p>
         ) : null}

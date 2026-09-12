@@ -18,7 +18,7 @@ const nextConfig: NextConfig = {
               "img-src 'self' blob: data:",
               "font-src 'self' data: https://fonts.gstatic.com",
               "media-src 'self' blob:",
-              "connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com",
+              "connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://github.com https://media.githubusercontent.com https://raw.githubusercontent.com https://objects.githubusercontent.com",
               "worker-src 'self' blob:",
               "frame-src 'self' blob:",
               "object-src 'none'",

@@ -13,16 +13,31 @@ import { normalizeLibraryBooks } from "@/lib/normalize-library";
 import type { AppSettings, BookRecord } from "@/lib/types";
 import { DEFAULT_SETTINGS } from "@/lib/types";
 
-/** Bumped so phones stuck on the broken v2 empty-loop re-seed once correctly. */
-const SEED_FLAG = "folio-local-books-seeded-v3";
-const SEED_PROGRESS = "folio-local-books-seed-progress-v3";
+/**
+ * v4: empty library always retries; success flag only set after ≥1 import.
+ * Older v3 flags blocked reseeding after failed LFS-pointer imports.
+ */
+const SEED_FLAG = "folio-local-books-seeded-v4";
+const SEED_PROGRESS = "folio-local-books-seed-progress-v4";
 const LFS_PREFIX = "version https://git-lfs.github.com/spec/v1";
+const DEFAULT_GITHUB_REPO = "alfredalpino/FOLIO";
+const DEFAULT_GITHUB_REF = "main";
+
 let seedInFlight: Promise<void> | null = null;
 
-function migrateLegacyFlags() {
+function clearLegacySeedLocks() {
   if (typeof window === "undefined") return;
-  // Do not migrate seeded-v2 → v3: v2 was often set after failed empty imports
-  // and must not block the one-time fixed reseed.
+  // Drop flags that previously locked an empty library forever.
+  for (const key of [
+    "folio-local-books-seeded-v3",
+    "folio-local-books-seeded-v2",
+    "folio-local-books-seeded-v1",
+    "paper-local-books-seeded-v2",
+    "folio-local-books-seed-progress-v3",
+    "folio-local-books-seed-progress-v2",
+  ]) {
+    window.localStorage.removeItem(key);
+  }
   const pairs: Array<[string, string]> = [
     ["paper-meta-normalized-v5", "folio-meta-normalized-v1"],
     ["paper-meta-normalized-v4", "folio-meta-normalized-v1"],
@@ -56,14 +71,70 @@ function formatUsage(usage?: number, quota?: number) {
   return `${used} MB of ~${(quota / 1048576).toFixed(0)} MB used locally`;
 }
 
-function looksLikeLfsPointer(blob: Blob) {
-  // Pointers are ~120–140 bytes; never treat huge files as pointers.
+async function looksLikeLfsPointer(blob: Blob) {
   if (blob.size >= 500) return false;
-  return blob
-    .slice(0, 80)
-    .text()
-    .then((text) => text.startsWith(LFS_PREFIX))
-    .catch(() => false);
+  try {
+    const text = await blob.slice(0, 80).text();
+    return text.startsWith(LFS_PREFIX);
+  } catch {
+    return false;
+  }
+}
+
+function githubMediaUrl(repo: string, ref: string, relativePath: string) {
+  const encoded = `books/${relativePath}`
+    .replaceAll("//", "/")
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/");
+  return `https://media.githubusercontent.com/media/${repo}/${ref}/${encoded}`;
+}
+
+async function fetchBookBlob(opts: {
+  path: string;
+  name: string;
+  lfs?: boolean;
+  expectedSize?: number;
+  repo: string;
+  ref: string;
+}): Promise<Blob> {
+  const tryUrls: string[] = [];
+
+  // Public GitHub LFS CDN — avoids Vercel timeouts on large books.
+  if (opts.lfs !== false) {
+    tryUrls.push(githubMediaUrl(opts.repo, opts.ref, opts.path));
+  }
+  // Same-origin proxy (local disk in dev, or GitHub fallback on server).
+  tryUrls.push(`/api/local-books/file?path=${encodeURIComponent(opts.path)}`);
+
+  let lastError: Error | null = null;
+  for (const url of tryUrls) {
+    try {
+      const res = await fetch(url, { redirect: "follow", cache: "no-store" });
+      if (!res.ok) {
+        lastError = new Error(`${url} → ${res.status}`);
+        continue;
+      }
+      const blob = await res.blob();
+      if (blob.size < 500 || (await looksLikeLfsPointer(blob))) {
+        lastError = new Error(`${url} returned LFS pointer / tiny payload (${blob.size})`);
+        continue;
+      }
+      if (opts.expectedSize && opts.expectedSize > 1000) {
+        // Allow slight mismatch; reject gross truncation.
+        if (blob.size < opts.expectedSize * 0.5) {
+          lastError = new Error(
+            `${url} truncated (${blob.size} < ${opts.expectedSize})`,
+          );
+          continue;
+        }
+      }
+      return blob;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+    }
+  }
+  throw lastError || new Error(`Failed to fetch ${opts.name}`);
 }
 
 async function runSeed(
@@ -81,34 +152,46 @@ async function runSeed(
   const seeded = window.localStorage.getItem(SEED_FLAG) === "1";
   const inProgress = window.localStorage.getItem(SEED_PROGRESS);
 
-  // Finished seed (success or hard-fail): never auto-download again.
-  // Clear site data or open with ?seed=1 to reload from GitHub.
-  if (seeded && !forceSeed) {
+  // Offline-first: library already on device and seed finished → never re-download.
+  if (libraryCount > 0 && seeded && !forceSeed && !inProgress) {
     return;
   }
 
-  // Books already on device and no interrupted seed → stay offline.
+  // Has books, interrupted progress cleared, not forced → mark done.
   if (libraryCount > 0 && !inProgress && !forceSeed) {
     window.localStorage.setItem(SEED_FLAG, "1");
     return;
   }
 
-  // Otherwise: empty library, or resume after a mid-seed refresh.
+  // Empty library: always attempt (ignore stale "seeded" from failed runs).
+  // Resume via SEED_PROGRESS when a prior pass was interrupted.
 
-  const listRes = await fetch("/api/local-books");
+  const listRes = await fetch("/api/local-books", { cache: "no-store" });
   if (!listRes.ok) {
-    setStatus("Library catalog unavailable");
-    window.localStorage.setItem(SEED_FLAG, "1");
+    setStatus("Library catalog unavailable. Check your connection.");
     return;
   }
+
   const payload = (await listRes.json()) as {
-    books: Array<{ path: string; name: string; size?: number; lfs?: boolean }>;
-    error?: string;
+    books: Array<{
+      path: string;
+      name: string;
+      size?: number;
+      lfs?: boolean;
+    }>;
+    github?: { repo?: string; ref?: string };
   };
-  const entries = payload.books || [];
+
+  const repo = payload.github?.repo || DEFAULT_GITHUB_REPO;
+  const ref = payload.github?.ref || DEFAULT_GITHUB_REF;
+
+  // Smallest first so titles appear before multi‑MB downloads finish.
+  const entries = [...(payload.books || [])].sort(
+    (a, b) => (a.size || 0) - (b.size || 0),
+  );
+
   if (!entries.length) {
-    window.localStorage.setItem(SEED_FLAG, "1");
-    setStatus("");
+    setStatus("No books found in the server catalog.");
     return;
   }
 
@@ -118,54 +201,46 @@ async function runSeed(
 
   for (let i = Math.max(0, startAt); i < entries.length; i += 1) {
     const entry = entries[i];
-    setStatus(`Loading library ${i + 1}/${entries.length}…`);
+    const mb = entry.size ? ` · ${(entry.size / 1048576).toFixed(1)} MB` : "";
+    setStatus(`Loading library ${i + 1}/${entries.length}${mb}…`);
     try {
-      const fileRes = await fetch(
-        `/api/local-books/file?path=${encodeURIComponent(entry.path)}`,
-      );
-      if (!fileRes.ok) {
-        failed += 1;
-        window.localStorage.setItem(SEED_PROGRESS, String(i + 1));
-        continue;
-      }
-      const blob = await fileRes.blob();
-      if (blob.size < 500 || (await looksLikeLfsPointer(blob))) {
-        failed += 1;
-        console.error("Skipping LFS pointer / empty payload", entry.name, blob.size);
-        window.localStorage.setItem(SEED_PROGRESS, String(i + 1));
-        continue;
-      }
+      const blob = await fetchBookBlob({
+        path: entry.path,
+        name: entry.name,
+        lfs: entry.lfs,
+        expectedSize: entry.size,
+        repo,
+        ref,
+      });
       const file = new File([blob], entry.name, {
         type: blob.type || "application/octet-stream",
       });
       await importBookFile(file);
       imported += 1;
+      await refresh();
     } catch (error) {
       failed += 1;
       console.error("Failed to import", entry.name, error);
     }
     window.localStorage.setItem(SEED_PROGRESS, String(i + 1));
-    if (imported > 0 && (imported % 2 === 0 || i === entries.length - 1)) {
-      await refresh();
-    }
   }
 
-  // Always mark finished so refresh does not replay the countdown.
-  window.localStorage.setItem(SEED_FLAG, "1");
   window.localStorage.removeItem(SEED_PROGRESS);
 
   if (imported > 0) {
+    window.localStorage.setItem(SEED_FLAG, "1");
     await normalizeLibraryBooks(true);
     await refresh();
     setStatus(
       failed
         ? `Loaded ${imported} books (${failed} skipped)`
-        : `Loaded ${imported} books`,
+        : `Loaded ${imported} books — saved on this device`,
     );
-    window.setTimeout(() => setStatus(""), 2800);
+    window.setTimeout(() => setStatus(""), 3200);
   } else {
+    // Do NOT set SEED_FLAG — next refresh / visit can retry.
     setStatus(
-      "Could not load books from the server. Open with ?seed=1 after fixing FOLIO_GITHUB_TOKEN, or add files manually.",
+      "Could not import books. Stay on this page on Wi‑Fi, or add files with + Add books.",
     );
   }
 }
@@ -201,7 +276,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
   status: "",
   usageLabel: "",
   hydrate: async () => {
-    migrateLegacyFlags();
+    clearLegacySeedLocks();
     const changed = await normalizeLibraryBooks();
     const [books, settings, estimate] = await Promise.all([
       listBooks(),
@@ -220,14 +295,15 @@ export const useLibrary = create<LibraryState>((set, get) => ({
         if (get().status.startsWith("Organized")) set({ status: "" });
       }, 2200);
     }
-    // Seed IndexedDB from the repo `books/` directory when the library is empty.
     void seedLocalBooks(
       () => get().refresh(),
       (status) => set({ status }),
       books.length,
     ).catch((error) => {
       console.error(error);
-      set({ status: "" });
+      set({
+        status: "Library seed failed. Refresh to retry.",
+      });
     });
   },
   refresh: async () => {
@@ -242,6 +318,11 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     set({ status: "Importing…" });
     try {
       const imported = await importBookFiles(files);
+      // Manual adds should not be wiped by a later seed; mark seeded.
+      if (imported.length) {
+        window.localStorage.setItem(SEED_FLAG, "1");
+        window.localStorage.removeItem(SEED_PROGRESS);
+      }
       await get().refresh();
       set({
         status:
