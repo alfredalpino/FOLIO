@@ -215,19 +215,7 @@ export function pdfPageFilter(profile: ReadingProfile): string {
   return PROFILE_COLORS[profile]?.pdfFilter || "none";
 }
 
-export function refreshDuration(profile: RefreshProfile): number {
-  switch (profile) {
-    case "kindle":
-      return 90;
-    case "eink":
-      return 140;
-    case "ghosting":
-      return 60;
-    case "paper":
-    default:
-      return 0;
-  }
-}
+export { waveformDuration as refreshDuration } from "./eink-waveform";
 
 export function fmtLangMap(value: unknown): string {
   if (!value) return "";

@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { CoverThumb } from "@/components/CoverThumb";
-import { formatBytes } from "@/lib/book-meta";
 import type { BookRecord } from "@/lib/types";
 
 function pct(n: number) {
@@ -12,16 +11,20 @@ function pct(n: number) {
 export function BookTile({
   book,
   onRemove,
-  compact = false,
+  variant = "cover",
 }: {
   book: BookRecord;
   onRemove?: () => void;
-  compact?: boolean;
+  /** cover = library grid; rail = home carousel */
+  variant?: "cover" | "rail";
 }) {
+  const finished = book.progress >= 0.98;
+  const started = book.progress > 0.001 && !finished;
+
   return (
-    <li className={compact ? "book-tile compact" : "book-tile"}>
-      <Link className="book-tile-link" href={`/read/${book.id}`}>
-        <div className="book-cover-wrap">
+    <li className={`k-book k-book-${variant}`}>
+      <Link className="k-book-link" href={`/read/${book.id}`}>
+        <div className="k-book-cover">
           <CoverThumb
             id={book.id}
             title={book.title}
@@ -29,31 +32,23 @@ export function BookTile({
             format={book.format}
             hasCover={book.hasCover}
           />
-          {book.progress > 0.001 ? (
-            <span className="book-progress">{pct(book.progress)}</span>
+          {finished ? <span className="k-ribbon">Read</span> : null}
+          {started ? (
+            <span className="k-progress-pill">{pct(book.progress)}</span>
           ) : null}
         </div>
-        <span className="book-tile-title">{book.title}</span>
-        {!compact ? (
-          <>
-            <span className="book-tile-meta">
-              {book.authors[0] || book.format.toUpperCase()}
-              {book.shelf ? ` · ${book.shelf}` : ""}
-            </span>
-            <span className="book-tile-sub muted tiny">
-              {book.format.toUpperCase()} · {formatBytes(book.size)}
-            </span>
-          </>
+        {variant === "rail" ? (
+          <span className="k-book-caption">{book.title}</span>
         ) : null}
       </Link>
       {onRemove ? (
         <button
           type="button"
-          className="ghost-btn tile-remove"
+          className="k-book-remove"
           aria-label={`Remove ${book.title}`}
           onClick={onRemove}
         >
-          Remove
+          ×
         </button>
       ) : null}
     </li>

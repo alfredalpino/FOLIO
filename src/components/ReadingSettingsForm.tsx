@@ -116,7 +116,7 @@ export function ReadingSettingsForm({
       </label>
 
       <label className="field">
-        <span>Page refresh</span>
+        <span>Page refresh (OLED imitation)</span>
         <select
           value={settings.refresh}
           onChange={(e) =>
@@ -124,9 +124,9 @@ export function ReadingSettingsForm({
           }
         >
           <option value="paper">Instant</option>
-          <option value="kindle">Kindle</option>
-          <option value="eink">E-Ink flash</option>
-          <option value="ghosting">Ghosting</option>
+          <option value="kindle">Soft flash</option>
+          <option value="eink">GC16 e-ink flash</option>
+          <option value="ghosting">Ghosting residue</option>
         </select>
       </label>
 

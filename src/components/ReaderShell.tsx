@@ -17,8 +17,8 @@ import {
   contentCSS,
   pdfPageFilter,
   PROFILE_COLORS,
-  refreshDuration,
 } from "@/lib/profiles";
+import { runWaveform } from "@/lib/eink-waveform";
 import { ReadingSettingsForm } from "@/components/ReadingSettingsForm";
 import type {
   AppSettings,
@@ -58,7 +58,9 @@ export function ReaderShell({ bookId }: { bookId: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<FoliateView | null>(null);
   const flashRef = useRef<HTMLDivElement>(null);
+  const ghostRef = useRef<HTMLDivElement>(null);
   const saveTimer = useRef<number | null>(null);
+  const turningRef = useRef(false);
 
   const [book, setBook] = useState<BookRecord | null>(null);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
@@ -74,14 +76,11 @@ export function ReaderShell({ bookId }: { bookId: string }) {
   const [booting, setBooting] = useState(true);
 
   const flash = useCallback(async (profile: AppSettings["refresh"]) => {
-    const el = flashRef.current;
-    if (!el) return;
-    const ms = refreshDuration(profile);
-    if (ms <= 0) return;
-    el.dataset.mode = profile;
-    el.classList.add("on");
-    await new Promise((r) => window.setTimeout(r, ms));
-    el.classList.remove("on");
+    if (!flashRef.current) return;
+    await runWaveform(
+      { flash: flashRef.current, ghost: ghostRef.current },
+      profile,
+    );
   }, []);
 
   const applyReaderStyle = useCallback((view: FoliateView, s: AppSettings) => {
@@ -110,10 +109,16 @@ export function ReaderShell({ bookId }: { bookId: string }) {
   const turn = useCallback(
     async (dir: "prev" | "next") => {
       const view = viewRef.current;
-      if (!view) return;
-      await flash(settings.refresh);
-      if (dir === "next") await view.goRight();
-      else await view.goLeft();
+      if (!view || turningRef.current) return;
+      turningRef.current = true;
+      try {
+        // Flash first so the clear covers the old page (e-ink feel)
+        await flash(settings.refresh);
+        if (dir === "next") await view.goRight();
+        else await view.goLeft();
+      } finally {
+        turningRef.current = false;
+      }
     },
     [flash, settings.refresh],
   );
@@ -316,8 +321,10 @@ export function ReaderShell({ bookId }: { bookId: string }) {
     <div
       className="reader-root"
       data-profile={settings.profile}
+      data-refresh={settings.refresh}
       data-format={book?.format || "epub"}
     >
+      <div ref={ghostRef} className="page-ghost" aria-hidden />
       <div ref={flashRef} className="page-flash" aria-hidden />
       <div
         ref={hostRef}
