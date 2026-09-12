@@ -1,5 +1,25 @@
-export type ReadingProfile = "paper" | "newspaper" | "night" | "terminal";
+export type ReadingProfile =
+  | "paper"
+  | "sepia"
+  | "newspaper"
+  | "slate"
+  | "night"
+  | "softnight"
+  | "lighthouse"
+  | "terminal";
+
 export type RefreshProfile = "paper" | "kindle" | "eink" | "ghosting";
+
+export type ReadingFont =
+  | "book"
+  | "classic"
+  | "literary"
+  | "news"
+  | "dyslexic"
+  | "modern"
+  | "mono";
+
+export type TextAlign = "left" | "justify" | "center" | "right";
 
 export interface BookRecord {
   id: string;
@@ -51,22 +71,31 @@ export interface AppSettings {
   id: "settings";
   profile: ReadingProfile;
   refresh: RefreshProfile;
+  font: ReadingFont;
   fontSize: number;
   lineHeight: number;
   margin: number;
-  justify: boolean;
+  align: TextAlign;
+  /** Extra letter-spacing in em (Kindle “boldness” adjacent control) */
+  letterSpacing: number;
+  hyphenate: boolean;
   volumeKeys: boolean;
   wakeLock: boolean;
+  /** @deprecated use align — kept for migration */
+  justify?: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
   id: "settings",
-  profile: "paper",
+  profile: "sepia",
   refresh: "paper",
-  fontSize: 100,
-  lineHeight: 1.65,
-  margin: 8,
-  justify: true,
+  font: "book",
+  fontSize: 112,
+  lineHeight: 1.55,
+  margin: 10,
+  align: "justify",
+  letterSpacing: 0,
+  hyphenate: true,
   volumeKeys: false,
   wakeLock: true,
 };
