@@ -17,6 +17,8 @@ export interface BookRecord {
   progress: number;
   chapterLabel: string;
   hasCover: boolean;
+  /** Soft collection used for shelf filters */
+  shelf?: string;
 }
 
 export interface ProgressRecord {
