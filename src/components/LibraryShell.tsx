@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef } from "react";
-import { InstallAppButton } from "@/components/InstallAppButton";
 import { useLibrary } from "@/store/library";
 import type { BookRecord, ReadingProfile, RefreshProfile } from "@/lib/types";
 
@@ -83,7 +82,6 @@ export function LibraryShell() {
       <header className="ledger-brand">
         <p className="brand">PAPER</p>
         <p className="tagline">A private reading machine.</p>
-        <InstallAppButton />
       </header>
 
       {cont ? (

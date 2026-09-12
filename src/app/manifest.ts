@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "PAPER",
     description:
       "A private, local-first, e-ink-inspired reading machine that runs on your phone.",
-    start_url: "/",
+    start_url: "/?utm_source=pwa",
     scope: "/",
     display: "standalone",
     display_override: ["standalone", "minimal-ui"],
@@ -54,14 +54,5 @@ export default function manifest(): MetadataRoute.Manifest {
       },
     ],
     prefer_related_applications: false,
-    file_handlers: [
-      {
-        action: "/",
-        accept: {
-          "application/epub+zip": [".epub"],
-          "application/pdf": [".pdf"],
-        },
-      },
-    ],
   } as MetadataRoute.Manifest;
 }
