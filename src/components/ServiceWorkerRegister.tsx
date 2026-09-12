@@ -2,10 +2,7 @@
 
 import { useEffect } from "react";
 
-/**
- * Register the service worker early so the app is installable.
- * Custom install UI lives in InstallAppButton (captures beforeinstallprompt).
- */
+/** Register the service worker so Chrome can offer its native Install app UI. */
 export function ServiceWorkerRegister() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;

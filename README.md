@@ -24,11 +24,10 @@ Open [http://localhost:3000](http://localhost:3000), add an EPUB, then **Add to 
 
 ## Notes
 
-- Your personal `books/` folder ships with the repo (Git LFS). On first open (empty library), FOLIO downloads each book once into on-device IndexedDB, then stays offline until you clear site data. Refresh never re-downloads.
-- On Vercel the deploy usually only has LFS pointer stubs. Set `FOLIO_GITHUB_TOKEN` (a GitHub PAT with `contents:read` on this private repo) so `/api/local-books/file` can resolve real binaries. Optional: `FOLIO_GITHUB_REPO=owner/name`, `FOLIO_GITHUB_REF=main`. Force a reseed with `?seed=1`.
+- Your personal `books/` folder ships with the repo (Git LFS). On first open (empty library), FOLIO downloads each book once into on-device IndexedDB, then stays offline until you clear site data. Refresh never re-downloads. Locally, real LFS-checked-out files are served from disk; on Vercel, LFS pointers are resolved from the public GitHub repo (optional `FOLIO_GITHUB_TOKEN` only if the repo is private again). Force a reseed with `?seed=1`.
 - Page turns are instant by default. Optional Kindle / E-Ink / Ghosting profiles exist in settings.
 - Tap zones: left = previous, right = next, center = menu.
-- Install: use **Install as app** when Chrome offers it, or Share → Add to Home Screen on iPhone.
+- PWA: Chrome/Edge show their own **Install app** control in the address bar / browser menu when the app is installable (HTTPS, manifest, service worker). On iPhone: Share → Add to Home Screen.
 
 ## License
 

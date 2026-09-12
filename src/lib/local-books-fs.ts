@@ -91,26 +91,70 @@ function githubToken() {
   );
 }
 
+function bookContentType(relativePath: string) {
+  const ext = path.extname(relativePath).toLowerCase();
+  if (ext === ".pdf") return "application/pdf";
+  if (ext === ".epub") return "application/epub+zip";
+  return "application/octet-stream";
+}
+
+function asBookStream(
+  relativePath: string,
+  body: ReadableStream<Uint8Array>,
+  size: number,
+  source: "github-lfs" | "disk",
+) {
+  if (size > 0 && size < 500) {
+    throw new Error(`Resolved book looks like an LFS pointer (${size} bytes)`);
+  }
+  return {
+    stream: body,
+    size,
+    type: bookContentType(relativePath),
+    name: path.basename(relativePath),
+    source,
+  };
+}
+
 async function openGitHubLfsStream(
   relativePath: string,
   expectedSize: number,
 ) {
-  const token = githubToken();
-  if (!token) {
-    throw new Error(
-      "Book binary unavailable (Git LFS pointer). Set FOLIO_GITHUB_TOKEN on the server.",
+  const repo = githubRepo();
+  const ref = githubRef();
+  const apiPath = `books/${relativePath}`.replaceAll("//", "/");
+  const encodedPath = apiPath
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/");
+
+  // Public repos: follow GitHub raw → media.githubusercontent.com (no token).
+  const rawUrl = `https://github.com/${repo}/raw/${encodeURIComponent(ref)}/${encodedPath}`;
+  const rawRes = await fetch(rawUrl, {
+    headers: { "User-Agent": "folio-reader", Accept: "application/octet-stream" },
+    redirect: "follow",
+    cache: "no-store",
+  });
+  if (rawRes.ok && rawRes.body) {
+    const size =
+      Number(rawRes.headers.get("content-length")) || expectedSize;
+    return asBookStream(
+      relativePath,
+      rawRes.body as ReadableStream<Uint8Array>,
+      size,
+      "github-lfs",
     );
   }
 
-  const repo = githubRepo();
-  const ref = githubRef();
-  // Contents API path is books/... relative to repo root
-  const apiPath = `books/${relativePath}`.replaceAll("//", "/");
-  const metaUrl = `https://api.github.com/repos/${repo}/contents/${apiPath
-    .split("/")
-    .map(encodeURIComponent)
-    .join("/")}?ref=${encodeURIComponent(ref)}`;
+  // Private / rate-limited: Contents API with optional token.
+  const token = githubToken();
+  if (!token) {
+    throw new Error(
+      `Book binary unavailable (Git LFS). Public raw fetch failed (${rawRes.status}).`,
+    );
+  }
 
+  const metaUrl = `https://api.github.com/repos/${repo}/contents/${encodedPath}?ref=${encodeURIComponent(ref)}`;
   const metaRes = await fetch(metaUrl, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -130,7 +174,6 @@ async function openGitHubLfsStream(
   const meta = (await metaRes.json()) as {
     download_url?: string | null;
     size?: number;
-    type?: string;
   };
 
   if (!meta.download_url) {
@@ -152,26 +195,12 @@ async function openGitHubLfsStream(
     meta.size ||
     expectedSize;
 
-  // Reject accidental pointer payloads
-  if (size > 0 && size < 500) {
-    throw new Error(`Resolved book looks like an LFS pointer (${size} bytes)`);
-  }
-
-  const ext = path.extname(relativePath).toLowerCase();
-  const type =
-    ext === ".pdf"
-      ? "application/pdf"
-      : ext === ".epub"
-        ? "application/epub+zip"
-        : "application/octet-stream";
-
-  return {
-    stream: fileRes.body as ReadableStream<Uint8Array>,
+  return asBookStream(
+    relativePath,
+    fileRes.body as ReadableStream<Uint8Array>,
     size,
-    type,
-    name: path.basename(relativePath),
-    source: "github-lfs" as const,
-  };
+    "github-lfs",
+  );
 }
 
 export async function listLocalBooks(): Promise<LocalBookEntry[]> {
