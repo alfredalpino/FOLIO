@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BookTile } from "@/components/BookTile";
 import { CoverThumb } from "@/components/CoverThumb";
+import { ReadingSettingsForm } from "@/components/ReadingSettingsForm";
 import { shelfOrder } from "@/lib/book-meta";
 import {
   clubByAuthor,
@@ -11,7 +12,7 @@ import {
   type LibraryView,
 } from "@/lib/library-organize";
 import { useLibrary } from "@/store/library";
-import type { BookRecord, ReadingProfile, RefreshProfile } from "@/lib/types";
+import type { BookRecord } from "@/lib/types";
 
 type FormatFilter = "all" | "epub" | "pdf";
 
@@ -412,59 +413,11 @@ export function LibraryShell() {
                 Close
               </button>
             </div>
-            <label className="field">
-              <span>Profile</span>
-              <select
-                value={settings.profile}
-                onChange={(e) =>
-                  void updateSettings({
-                    profile: e.target.value as ReadingProfile,
-                  })
-                }
-              >
-                <option value="paper">Cream</option>
-                <option value="newspaper">Newspaper</option>
-                <option value="night">Night</option>
-                <option value="terminal">Terminal</option>
-              </select>
-            </label>
-            <label className="field">
-              <span>Page refresh</span>
-              <select
-                value={settings.refresh}
-                onChange={(e) =>
-                  void updateSettings({
-                    refresh: e.target.value as RefreshProfile,
-                  })
-                }
-              >
-                <option value="paper">Instant</option>
-                <option value="kindle">Kindle</option>
-                <option value="eink">E-Ink flash</option>
-                <option value="ghosting">Ghosting</option>
-              </select>
-            </label>
-            <label className="field check">
-              <input
-                type="checkbox"
-                checked={settings.wakeLock}
-                onChange={(e) =>
-                  void updateSettings({ wakeLock: e.target.checked })
-                }
-              />
-              <span>Keep screen awake while reading</span>
-            </label>
-            <label className="field check">
-              <input
-                type="checkbox"
-                checked={settings.volumeKeys}
-                onChange={(e) =>
-                  void updateSettings({ volumeKeys: e.target.checked })
-                }
-              />
-              <span>Volume keys turn pages (Android)</span>
-            </label>
-            <p className="muted tiny">{usageLabel}</p>
+            <ReadingSettingsForm
+              settings={settings}
+              onChange={(patch) => void updateSettings(patch)}
+            />
+            <p className="muted tiny settings-usage">{usageLabel}</p>
           </div>
         </div>
       ) : null}

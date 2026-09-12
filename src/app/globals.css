@@ -1,10 +1,10 @@
 :root {
-  --bg: #f6f3eb;
-  --fg: #1c1917;
-  --muted: #78716c;
-  --line: #d6d3d1;
-  --card: #fffdf8;
-  --flash: #f6f3eb;
+  --bg: #f4ecd8;
+  --fg: #3b2f2f;
+  --muted: #7a6a55;
+  --line: #d2c4a8;
+  --card: #f7f0e0;
+  --flash: #f4ecd8;
   --danger: #7f1d1d;
   --font-display: var(--font-display), "Iowan Old Style", Palatino, serif;
   --font-body: var(--font-body), "Source Serif 4", Georgia, serif;
@@ -13,25 +13,95 @@
 }
 
 html[data-profile="night"],
+html[data-profile="softnight"],
 html[data-profile="terminal"],
 body[data-profile="night"],
+body[data-profile="softnight"],
 body[data-profile="terminal"],
 .ledger[data-profile="night"],
+.ledger[data-profile="softnight"],
 .ledger[data-profile="terminal"],
 .reader-root[data-profile="night"],
+.reader-root[data-profile="softnight"],
 .reader-root[data-profile="terminal"] {
   color-scheme: dark;
+}
+
+html[data-profile="paper"],
+.ledger[data-profile="paper"],
+.reader-root[data-profile="paper"] {
+  --bg: #f4f1ea;
+  --fg: #1c1917;
+  --muted: #78716c;
+  --line: #d6d3d1;
+  --card: #fffcf5;
+  --flash: #f4f1ea;
+}
+
+html[data-profile="sepia"],
+.ledger[data-profile="sepia"],
+.reader-root[data-profile="sepia"] {
+  --bg: #e8dcc8;
+  --fg: #3b2f2f;
+  --muted: #7a6a55;
+  --line: #d2c4a8;
+  --card: #f7f0e0;
+  --flash: #e8dcc8;
+}
+
+html[data-profile="newspaper"],
+.ledger[data-profile="newspaper"],
+.reader-root[data-profile="newspaper"] {
+  --bg: #ebe8df;
+  --fg: #111111;
+  --muted: #525252;
+  --line: #cfcac0;
+  --card: #f7f5ef;
+  --flash: #ebe8df;
+}
+
+html[data-profile="slate"],
+.ledger[data-profile="slate"],
+.reader-root[data-profile="slate"] {
+  --bg: #d7dce2;
+  --fg: #1f2933;
+  --muted: #616e7c;
+  --line: #b0b8c1;
+  --card: #eef1f4;
+  --flash: #d7dce2;
 }
 
 html[data-profile="night"],
 .ledger[data-profile="night"],
 .reader-root[data-profile="night"] {
-  --bg: #1c1917;
-  --fg: #e7e5e4;
+  --bg: #0f0e0d;
+  --fg: #d6d3d1;
   --muted: #a8a29e;
-  --line: #44403c;
-  --card: #292524;
+  --line: #3f3a36;
+  --card: #171513;
   --flash: #000;
+}
+
+html[data-profile="softnight"],
+.ledger[data-profile="softnight"],
+.reader-root[data-profile="softnight"] {
+  --bg: #1a1714;
+  --fg: #cfc6b8;
+  --muted: #9c9080;
+  --line: #3a342c;
+  --card: #221e19;
+  --flash: #000;
+}
+
+html[data-profile="lighthouse"],
+.ledger[data-profile="lighthouse"],
+.reader-root[data-profile="lighthouse"] {
+  --bg: #ffffff;
+  --fg: #000000;
+  --muted: #444444;
+  --line: #dddddd;
+  --card: #ffffff;
+  --flash: #ffffff;
 }
 
 html[data-profile="terminal"],
@@ -138,7 +208,9 @@ button {
 }
 
 .settings-dialog {
-  width: min(24rem, 100%);
+  width: min(26rem, 100%);
+  max-height: min(88dvh, 40rem);
+  overflow: auto;
   background: var(--card);
   border: 1px solid var(--line);
   padding: 1.25rem 1.2rem 1.1rem;
@@ -159,6 +231,20 @@ button {
   font-size: 1.35rem;
   font-weight: 500;
   letter-spacing: -0.02em;
+}
+
+.settings-form {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.settings-usage {
+  margin-top: 0.75rem;
+}
+
+.side-panel.settings-side {
+  max-height: 70dvh;
+  overflow: auto;
 }
 
 .brand {
@@ -754,6 +840,34 @@ body.dropping .drop-veil {
   width: 100%;
   height: 100%;
   display: block;
+}
+
+/* Kindle-like fixed page for PDFs */
+.reader-root[data-format="pdf"] .reader-host {
+  display: grid;
+  place-items: center;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg) 92%, #000 8%) 0%,
+      var(--bg) 18%,
+      var(--bg) 82%,
+      color-mix(in srgb, var(--bg) 92%, #000 8%) 100%
+    );
+  padding: env(safe-area-inset-top, 0) 0.75rem env(safe-area-inset-bottom, 0);
+}
+
+.reader-root[data-format="pdf"] .reader-host foliate-view {
+  width: min(100%, 52rem);
+  height: 100%;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--fg) 8%, transparent),
+    0 18px 48px color-mix(in srgb, var(--fg) 16%, transparent);
+  background: var(--card);
+}
+
+.reader-root[data-format="pdf"] foliate-view::part(filter) {
+  filter: var(--folio-pdf-filter, none);
 }
 
 .page-flash {

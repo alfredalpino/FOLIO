@@ -8,6 +8,7 @@ import type {
   ProgressRecord,
 } from "./types";
 import { DEFAULT_SETTINGS } from "./types";
+import { normalizeSettings } from "./profiles";
 
 const LEGACY_DB = "paper-reader";
 const DB_NAME = "folio-reader";
@@ -196,7 +197,9 @@ export async function removeBookmark(id: string) {
 export async function getSettings(): Promise<AppSettings> {
   await ensureFolioDb();
   const existing = await db.settings.get("settings");
-  if (existing) return { ...DEFAULT_SETTINGS, ...existing };
+  if (existing) {
+    return normalizeSettings({ ...DEFAULT_SETTINGS, ...existing });
+  }
   await db.settings.put(DEFAULT_SETTINGS);
   return DEFAULT_SETTINGS;
 }
@@ -204,7 +207,11 @@ export async function getSettings(): Promise<AppSettings> {
 export async function saveSettings(patch: Partial<AppSettings>) {
   await ensureFolioDb();
   const current = await getSettings();
-  const next = { ...current, ...patch, id: "settings" as const };
+  const next = normalizeSettings({
+    ...current,
+    ...patch,
+    id: "settings" as const,
+  });
   await db.settings.put(next);
   return next;
 }

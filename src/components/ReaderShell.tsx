@@ -11,8 +11,15 @@ import {
   listBookmarks,
   removeBookmark,
   saveProgress,
+  saveSettings,
 } from "@/lib/db";
-import { contentCSS, PROFILE_COLORS, refreshDuration } from "@/lib/profiles";
+import {
+  contentCSS,
+  pdfPageFilter,
+  PROFILE_COLORS,
+  refreshDuration,
+} from "@/lib/profiles";
+import { ReadingSettingsForm } from "@/components/ReadingSettingsForm";
 import type {
   AppSettings,
   BookmarkRecord,
@@ -78,22 +85,26 @@ export function ReaderShell({ bookId }: { bookId: string }) {
   }, []);
 
   const applyReaderStyle = useCallback((view: FoliateView, s: AppSettings) => {
-    const colors = PROFILE_COLORS[s.profile];
+    const colors = PROFILE_COLORS[s.profile] || PROFILE_COLORS.sepia;
     document.documentElement.dataset.profile = s.profile;
     document.body.style.background = colors.bg;
     document.body.style.color = colors.fg;
     if (hostRef.current) hostRef.current.style.background = colors.bg;
     view.renderer?.setStyles?.(contentCSS(s));
     view.renderer?.setAttribute("flow", "paginated");
-    // Never animate page turns — folio feel
     view.renderer?.removeAttribute("animated");
-    const margin = 18 + s.margin * 4;
+    const margin = 16 + s.margin * 4;
     view.renderer?.setAttribute("margin", `${margin}px`);
-    view.renderer?.setAttribute("gap", "7%");
-    view.renderer?.setAttribute(
-      "max-inline-size",
-      s.profile === "newspaper" ? "720px" : "640px",
-    );
+    view.renderer?.setAttribute("gap", "6%");
+    // Kindle-ish measure: denser for newspaper, book column otherwise
+    const maxInline =
+      s.profile === "newspaper"
+        ? "720px"
+        : s.profile === "lighthouse"
+          ? "680px"
+          : "620px";
+    view.renderer?.setAttribute("max-inline-size", maxInline);
+    view.style.setProperty("--folio-pdf-filter", pdfPageFilter(s.profile));
   }, []);
 
   const turn = useCallback(
@@ -302,7 +313,11 @@ export function ReaderShell({ bookId }: { bookId: string }) {
   }
 
   return (
-    <div className="reader-root" data-profile={settings.profile}>
+    <div
+      className="reader-root"
+      data-profile={settings.profile}
+      data-format={book?.format || "epub"}
+    >
       <div ref={flashRef} className="page-flash" aria-hidden />
       <div
         ref={hostRef}
@@ -408,42 +423,16 @@ export function ReaderShell({ bookId }: { bookId: string }) {
           ) : null}
 
           {panel === "settings" ? (
-            <div className="side-panel">
-              <h3>Typography</h3>
-              <label className="field">
-                <span>Size {settings.fontSize}%</span>
-                <input
-                  type="range"
-                  min={80}
-                  max={180}
-                  step={5}
-                  value={settings.fontSize}
-                  onChange={(e) =>
-                    setSettings((prev) => ({
-                      ...prev,
-                      fontSize: Number(e.target.value),
-                    }))
-                  }
-                />
-              </label>
-              <label className="field">
-                <span>Margins</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={16}
-                  value={settings.margin}
-                  onChange={(e) =>
-                    setSettings((prev) => ({
-                      ...prev,
-                      margin: Number(e.target.value),
-                    }))
-                  }
-                />
-              </label>
-              <p className="muted tiny">
-                Profiles live on the library screen. Changes here apply instantly.
-              </p>
+            <div className="side-panel settings-side">
+              <h3>Reading</h3>
+              <ReadingSettingsForm
+                compact
+                settings={settings}
+                onChange={(patch) => {
+                  setSettings((prev) => ({ ...prev, ...patch }));
+                  void saveSettings(patch);
+                }}
+              />
             </div>
           ) : null}
         </div>
