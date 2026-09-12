@@ -3,13 +3,15 @@
 import { useEffect } from "react";
 
 /**
- * Register the service worker as early as possible so Chrome can treat the
- * site as installable and show its own install UI (omnibox / Android banner).
- * Do NOT call preventDefault on beforeinstallprompt — that hides Chrome's UI.
+ * Register the service worker early so the app is installable.
+ * Custom install UI lives in InstallAppButton (captures beforeinstallprompt).
  */
 export function ServiceWorkerRegister() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
+    if (process.env.NODE_ENV === "development") {
+      // Still register in dev so installability can be tested on localhost.
+    }
 
     void navigator.serviceWorker
       .register("/sw.js", { scope: "/", updateViaCache: "none" })
@@ -18,6 +20,8 @@ export function ServiceWorkerRegister() {
         if (reg.waiting) {
           reg.waiting.postMessage({ type: "SKIP_WAITING" });
         }
+        // Nudge updates so a new SW (folio-shell) takes over promptly.
+        void reg.update();
       })
       .catch(() => {
         /* ignore */

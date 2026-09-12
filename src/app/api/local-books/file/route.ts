@@ -1,11 +1,13 @@
-import { assertDevLocalBooks, openLocalBookStream } from "@/lib/local-books-fs";
+import { assertBooksAvailable, openLocalBookStream } from "@/lib/local-books-fs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/** Large PDFs from the repo `books/` folder need a long-lived Node function. */
+export const maxDuration = 300;
 
 export async function GET(request: Request) {
-  if (!assertDevLocalBooks()) {
-    return Response.json({ error: "Local books API disabled" }, { status: 404 });
+  if (!assertBooksAvailable()) {
+    return Response.json({ error: "Books library unavailable" }, { status: 404 });
   }
 
   const url = new URL(request.url);
@@ -21,7 +23,7 @@ export async function GET(request: Request) {
         "Content-Type": file.type,
         "Content-Length": String(file.size),
         "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(file.name)}`,
-        "Cache-Control": "no-store",
+        "Cache-Control": "private, max-age=3600",
       },
     });
   } catch (error) {

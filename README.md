@@ -1,4 +1,4 @@
-# PAPER
+# FOLIO
 
 A private, local-first, e-ink-inspired reading machine.
 
@@ -24,9 +24,10 @@ Open [http://localhost:3000](http://localhost:3000), add an EPUB, then **Add to 
 
 ## Notes
 
-- Your personal `books/` folder is gitignored and is never uploaded.
-- Page turns are instant by default (Paper refresh). Optional Kindle / E-Ink / Ghosting profiles exist in settings.
+- Your personal `books/` folder ships with the repo (Git LFS). On first open, FOLIO imports those files into on-device IndexedDB.
+- Page turns are instant by default. Optional Kindle / E-Ink / Ghosting profiles exist in settings.
 - Tap zones: left = previous, right = next, center = menu.
+- Install: use **Install as app** when Chrome offers it, or Share → Add to Home Screen on iPhone.
 
 ## License
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BookTile } from "@/components/BookTile";
 import { CoverThumb } from "@/components/CoverThumb";
+import { InstallAppButton } from "@/components/InstallAppButton";
 import { shelfOrder } from "@/lib/book-meta";
 import {
   clubByAuthor,
@@ -111,8 +112,9 @@ export function LibraryShell() {
   return (
     <main className="ledger shelf-layout" data-profile={settings.profile}>
       <header className="ledger-brand">
-        <p className="brand">PAPER</p>
+        <p className="brand">FOLIO</p>
         <p className="tagline">A private reading machine.</p>
+        <InstallAppButton />
         <p className="library-stats muted tiny">
           {books.length} books · {clubByAuthor(books).length} writers
           {multiAuthorCount
@@ -366,7 +368,7 @@ export function LibraryShell() {
               })
             }
           >
-            <option value="paper">Paper</option>
+            <option value="paper">Cream</option>
             <option value="newspaper">Newspaper</option>
             <option value="night">Night</option>
             <option value="terminal">Terminal</option>
@@ -382,7 +384,7 @@ export function LibraryShell() {
               })
             }
           >
-            <option value="paper">Paper (instant)</option>
+            <option value="paper">Instant</option>
             <option value="kindle">Kindle</option>
             <option value="eink">E-Ink flash</option>
             <option value="ghosting">Ghosting</option>

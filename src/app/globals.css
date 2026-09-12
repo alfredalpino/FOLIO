@@ -112,8 +112,45 @@ button {
   font-size: 1.05rem;
 }
 
+.install-btn {
+  appearance: none;
+  margin-top: 1.1rem;
+  background: transparent;
+  border: 1px solid var(--fg);
+  padding: 0.65rem 0.95rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.install-btn:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.install-btn:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+
+.install-ios {
+  margin-top: 0.25rem;
+}
+
+.install-help {
+  margin: 0.55rem 0 0;
+  max-width: 22rem;
+  line-height: 1.45;
+}
+
+.install-fallback {
+  margin: 0.85rem 0 0;
+  max-width: 26rem;
+  line-height: 1.45;
+}
+
 .library-stats {
-  margin: 0.65rem 0 0;
+  margin: 0.75rem 0 0;
 }
 
 .toolbar-label {

@@ -85,7 +85,7 @@ export function ReaderShell({ bookId }: { bookId: string }) {
     if (hostRef.current) hostRef.current.style.background = colors.bg;
     view.renderer?.setStyles?.(contentCSS(s));
     view.renderer?.setAttribute("flow", "paginated");
-    // Never animate page turns — paper feel
+    // Never animate page turns — folio feel
     view.renderer?.removeAttribute("animated");
     const margin = 18 + s.margin * 4;
     view.renderer?.setAttribute("margin", `${margin}px`);

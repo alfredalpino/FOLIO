@@ -13,9 +13,28 @@ import { normalizeLibraryBooks } from "@/lib/normalize-library";
 import type { AppSettings, BookRecord } from "@/lib/types";
 import { DEFAULT_SETTINGS } from "@/lib/types";
 
-const SEED_FLAG = "paper-local-books-seeded-v2";
-const SEED_PROGRESS = "paper-local-books-seed-progress-v2";
+const SEED_FLAG = "folio-local-books-seeded-v2";
+const SEED_PROGRESS = "folio-local-books-seed-progress-v2";
 let seedInFlight: Promise<void> | null = null;
+
+function migrateLegacyFlags() {
+  if (typeof window === "undefined") return;
+  const pairs: Array<[string, string]> = [
+    ["folio-local-books-seeded-v1", SEED_FLAG],
+    ["folio-local-books-seed-progress-v1", SEED_PROGRESS],
+    ["paper-local-books-seeded-v2", SEED_FLAG],
+    ["paper-local-books-seed-progress-v2", SEED_PROGRESS],
+    ["paper-meta-normalized-v5", "folio-meta-normalized-v1"],
+    ["paper-meta-normalized-v4", "folio-meta-normalized-v1"],
+    ["paper-meta-normalized-v3", "folio-meta-normalized-v1"],
+  ];
+  for (const [from, to] of pairs) {
+    const value = window.localStorage.getItem(from);
+    if (value != null && window.localStorage.getItem(to) == null) {
+      window.localStorage.setItem(to, value);
+    }
+  }
+}
 
 interface LibraryState {
   ready: boolean;
@@ -37,14 +56,23 @@ function formatUsage(usage?: number, quota?: number) {
   return `${used} MB of ~${(quota / 1048576).toFixed(0)} MB used locally`;
 }
 
-async function runSeed(refresh: () => Promise<void>, setStatus: (s: string) => void) {
+async function runSeed(
+  refresh: () => Promise<void>,
+  setStatus: (s: string) => void,
+  libraryCount: number,
+) {
   const params = new URLSearchParams(window.location.search);
   if (params.get("seed") === "1") {
     window.localStorage.removeItem(SEED_FLAG);
     window.localStorage.removeItem(SEED_PROGRESS);
   }
 
-  if (window.localStorage.getItem(SEED_FLAG) === "1") return;
+  // Always (re)seed when the library is empty, even if a prior flag was set.
+  if (libraryCount === 0) {
+    window.localStorage.removeItem(SEED_FLAG);
+  } else if (window.localStorage.getItem(SEED_FLAG) === "1") {
+    return;
+  }
 
   const listRes = await fetch("/api/local-books");
   if (!listRes.ok) return;
@@ -90,18 +118,22 @@ async function runSeed(refresh: () => Promise<void>, setStatus: (s: string) => v
   setStatus("");
 }
 
-async function seedLocalBooks(refresh: () => Promise<void>, setStatus: (s: string) => void) {
+async function seedLocalBooks(
+  refresh: () => Promise<void>,
+  setStatus: (s: string) => void,
+  libraryCount: number,
+) {
   if (typeof window === "undefined") return;
   if (seedInFlight) return seedInFlight;
 
   const execute = async () => {
     if (typeof navigator !== "undefined" && "locks" in navigator) {
-      await navigator.locks.request("paper-local-book-seed", () =>
-        runSeed(refresh, setStatus),
+      await navigator.locks.request("folio-local-book-seed", () =>
+        runSeed(refresh, setStatus, libraryCount),
       );
       return;
     }
-    await runSeed(refresh, setStatus);
+    await runSeed(refresh, setStatus, libraryCount);
   };
 
   seedInFlight = execute().finally(() => {
@@ -117,6 +149,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
   status: "",
   usageLabel: "",
   hydrate: async () => {
+    migrateLegacyFlags();
     const changed = await normalizeLibraryBooks();
     const [books, settings, estimate] = await Promise.all([
       listBooks(),
@@ -135,10 +168,11 @@ export const useLibrary = create<LibraryState>((set, get) => ({
         if (get().status.startsWith("Organized")) set({ status: "" });
       }, 2200);
     }
-    // Agent-seeded local books land in IndexedDB without any Drive UI.
+    // Seed IndexedDB from the repo `books/` directory when the library is empty.
     void seedLocalBooks(
       () => get().refresh(),
       (status) => set({ status }),
+      books.length,
     ).catch((error) => {
       console.error(error);
       set({ status: "" });

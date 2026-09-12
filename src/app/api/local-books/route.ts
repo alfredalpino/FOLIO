@@ -1,11 +1,12 @@
-import { assertDevLocalBooks, listLocalBooks } from "@/lib/local-books-fs";
+import { assertBooksAvailable, listLocalBooks } from "@/lib/local-books-fs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function GET() {
-  if (!assertDevLocalBooks()) {
-    return Response.json({ error: "Local books API disabled" }, { status: 404 });
+  if (!assertBooksAvailable()) {
+    return Response.json({ error: "Books library unavailable" }, { status: 404 });
   }
 
   const books = await listLocalBooks();

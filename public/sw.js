@@ -1,5 +1,5 @@
-/* PAPER service worker — caches the app shell; books stay in IndexedDB. */
-const CACHE = "paper-shell-v2";
+/* FOLIO service worker — caches the app shell; books stay in IndexedDB. */
+const CACHE = "folio-shell-v1";
 const PRECACHE = [
   "/",
   "/manifest.webmanifest",
@@ -58,7 +58,7 @@ self.addEventListener("fetch", (event) => {
           const cached = (await caches.match("/")) || (await caches.match(request));
           return (
             cached ||
-            new Response("PAPER is offline. Reconnect to reload the app shell.", {
+            new Response("FOLIO is offline. Reconnect to reload the app shell.", {
               status: 503,
               headers: { "Content-Type": "text/plain; charset=utf-8" },
             })

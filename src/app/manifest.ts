@@ -3,8 +3,8 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "PAPER",
-    short_name: "PAPER",
+    name: "FOLIO",
+    short_name: "FOLIO",
     description:
       "A private, local-first, e-ink-inspired reading machine that runs on your phone.",
     start_url: "/?utm_source=pwa",
@@ -43,14 +43,14 @@ export default function manifest(): MetadataRoute.Manifest {
         sizes: "1280x720",
         type: "image/png",
         form_factor: "wide",
-        label: "PAPER library",
+        label: "FOLIO library",
       },
       {
         src: "/icons/screenshot-narrow.png",
         sizes: "720x1280",
         type: "image/png",
         form_factor: "narrow",
-        label: "PAPER on phone",
+        label: "FOLIO on phone",
       },
     ],
     prefer_related_applications: false,
